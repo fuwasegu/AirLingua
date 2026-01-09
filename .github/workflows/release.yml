@@ -106,20 +106,34 @@ jobs:
           mv "$APP_PATH" "build/Build/Products/Release/AirLingua.app"
           APP_PATH="build/Build/Products/Release/AirLingua.app"
 
-          # Bundle llama-completion with dependencies
+          # Bundle llama-completion with all dependencies
           RESOURCES_DIR="$APP_PATH/Contents/Resources"
           LLAMA_BIN="/opt/homebrew/bin/llama-completion"
-          LLAMA_LIB="/opt/homebrew/lib/libllama.dylib"
 
           # Copy binary
           cp "$LLAMA_BIN" "$RESOURCES_DIR/"
           chmod +x "$RESOURCES_DIR/llama-completion"
 
-          # Copy library
-          cp "$LLAMA_LIB" "$RESOURCES_DIR/"
+          # Copy all llama/ggml libraries
+          cp /opt/homebrew/lib/libllama.dylib "$RESOURCES_DIR/"
+          cp /opt/homebrew/lib/libggml.dylib "$RESOURCES_DIR/"
+          cp /opt/homebrew/lib/libggml-base.dylib "$RESOURCES_DIR/" 2>/dev/null || true
+          cp /opt/homebrew/lib/libggml-cpu.dylib "$RESOURCES_DIR/" 2>/dev/null || true
+          cp /opt/homebrew/lib/libggml-metal.dylib "$RESOURCES_DIR/" 2>/dev/null || true
+          cp /opt/homebrew/lib/libggml-blas.dylib "$RESOURCES_DIR/" 2>/dev/null || true
 
-          # Fix rpath to look in same directory
+          # Fix rpaths for the binary
           install_name_tool -change "@rpath/libllama.0.dylib" "@executable_path/libllama.dylib" "$RESOURCES_DIR/llama-completion"
+          install_name_tool -change "@rpath/libggml.0.dylib" "@executable_path/libggml.dylib" "$RESOURCES_DIR/llama-completion"
+          install_name_tool -change "@rpath/libggml-base.0.dylib" "@executable_path/libggml-base.dylib" "$RESOURCES_DIR/llama-completion" 2>/dev/null || true
+          install_name_tool -change "@rpath/libggml-cpu.0.dylib" "@executable_path/libggml-cpu.dylib" "$RESOURCES_DIR/llama-completion" 2>/dev/null || true
+
+          # Fix rpaths for libllama.dylib
+          install_name_tool -change "@rpath/libggml.0.dylib" "@loader_path/libggml.dylib" "$RESOURCES_DIR/libllama.dylib"
+          install_name_tool -change "@rpath/libggml-base.0.dylib" "@loader_path/libggml-base.dylib" "$RESOURCES_DIR/libllama.dylib" 2>/dev/null || true
+          install_name_tool -change "@rpath/libggml-cpu.0.dylib" "@loader_path/libggml-cpu.dylib" "$RESOURCES_DIR/libllama.dylib" 2>/dev/null || true
+          install_name_tool -change "@rpath/libggml-metal.0.dylib" "@loader_path/libggml-metal.dylib" "$RESOURCES_DIR/libllama.dylib" 2>/dev/null || true
+          install_name_tool -change "@rpath/libggml-blas.0.dylib" "@loader_path/libggml-blas.dylib" "$RESOURCES_DIR/libllama.dylib" 2>/dev/null || true
 
           # Remove quarantine attribute
           xattr -cr "$APP_PATH"
