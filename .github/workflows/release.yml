@@ -187,6 +187,14 @@ jobs:
             done
           done
 
+          # Re-sign all modified binaries (required after install_name_tool)
+          echo "=== Re-signing binaries ==="
+          for file in "$RESOURCES_DIR/llama-completion" "$RESOURCES_DIR"/*.dylib; do
+            [ -f "$file" ] || continue
+            codesign --force --sign - "$file"
+            echo "Signed: $(basename "$file")"
+          done
+
           # Debug: show what we bundled
           echo "=== Bundled files ==="
           ls -la "$RESOURCES_DIR/"
