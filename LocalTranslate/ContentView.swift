@@ -11,6 +11,7 @@ import UniformTypeIdentifiers
 /// メインコンテンツビュー
 struct ContentView: View {
     @EnvironmentObject var translationManager: TranslationManager
+    @StateObject private var memoryMonitor = MemoryMonitor()
     @State private var inputText: String = ""
     @State private var outputText: String = ""
     @State private var isTranslating: Bool = false
@@ -32,7 +33,13 @@ struct ContentView: View {
                         .foregroundColor(.secondary)
                 }
                 Spacer()
-                StatusIndicator(isReady: translationManager.isReady, isLoading: translationManager.isLoading)
+                VStack(alignment: .trailing, spacing: 2) {
+                    StatusIndicator(isReady: translationManager.isReady, isLoading: translationManager.isLoading)
+                    Text(memoryMonitor.formattedUsage)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .monospacedDigit()
+                }
             }
             .padding(.horizontal)
 

@@ -14,9 +14,13 @@ import Combine
 @MainActor
 class AppDelegate: NSObject, NSApplicationDelegate {
     let translationManager = TranslationManager()
+    private let memoryMonitor = MemoryMonitor()
 
     /// メニューバーアイテム
     private var statusItem: NSStatusItem?
+
+    /// メモリ表示用メニューアイテム
+    private var memoryMenuItem: NSMenuItem?
 
     /// ポップオーバーウィンドウ
     private var popoverWindow: NSWindow?
@@ -64,6 +68,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// メニューバーのメニューを更新
     private func updateStatusBarMenu() {
         let menu = NSMenu()
+        menu.delegate = self
 
         // タイトル（モデル名）
         let titleItem = NSMenuItem(title: "AirLingua", action: nil, keyEquivalent: "")
@@ -73,6 +78,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let modelItem = NSMenuItem(title: "モデル: \(translationManager.modelType.displayName)", action: nil, keyEquivalent: "")
         modelItem.isEnabled = false
         menu.addItem(modelItem)
+
+        // メモリ使用量
+        let memoryItem = NSMenuItem(title: "メモリ: \(memoryMonitor.formattedUsage)", action: nil, keyEquivalent: "")
+        memoryItem.isEnabled = false
+        menu.addItem(memoryItem)
+        self.memoryMenuItem = memoryItem
 
         // ライセンス警告（PLaMoの場合）
         if translationManager.modelType == .plamo {
@@ -548,5 +559,17 @@ class TranslationManager: ObservableObject {
         }
 
         return try await translator.translate(text, from: sourceLanguage, to: targetLanguage)
+    }
+}
+
+// MARK: - NSMenuDelegate
+
+extension AppDelegate: NSMenuDelegate {
+    /// メニューが開かれる直前に呼ばれる
+    nonisolated func menuWillOpen(_ menu: NSMenu) {
+        Task { @MainActor in
+            // メモリ表示を更新
+            memoryMenuItem?.title = "メモリ: \(memoryMonitor.formattedUsage)"
+        }
     }
 }
