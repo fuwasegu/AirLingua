@@ -21,6 +21,10 @@ jobs:
         with:
           xcode-version: latest
 
+      - name: Install llama.cpp
+        run: |
+          brew install llama.cpp
+
       - name: Build
         run: |
           xcodebuild -project LocalTranslate.xcodeproj \
@@ -37,9 +41,15 @@ jobs:
 
           # Rename to AirLingua.app
           mv "$APP_PATH" "build/Build/Products/Release/AirLingua.app"
+          APP_PATH="build/Build/Products/Release/AirLingua.app"
+
+          # Bundle llama-completion
+          RESOURCES_DIR="$APP_PATH/Contents/Resources"
+          cp /opt/homebrew/bin/llama-completion "$RESOURCES_DIR/" || cp /usr/local/bin/llama-completion "$RESOURCES_DIR/"
+          chmod +x "$RESOURCES_DIR/llama-completion"
 
           # Remove quarantine attribute
-          xattr -cr "build/Build/Products/Release/AirLingua.app"
+          xattr -cr "$APP_PATH"
 
       - name: Create ZIP
         run: |

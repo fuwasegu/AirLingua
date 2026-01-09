@@ -47,13 +47,13 @@ public final class PLaMoTranslator: TranslationService {
     /// llama-completion のパスを探す
     private static func findLlamaCompletion() -> String? {
         let possiblePaths = [
+            // アプリバンドル内（優先）
+            Bundle.main.path(forResource: "llama-completion", ofType: nil),
+            // システムにインストールされている場合
             "/opt/homebrew/bin/llama-completion",
             "/usr/local/bin/llama-completion",
-            // フォールバック: llama-cli
             "/opt/homebrew/bin/llama-cli",
             "/usr/local/bin/llama-cli",
-            // アプリバンドル内
-            Bundle.main.path(forResource: "llama-completion", ofType: nil),
         ].compactMap { $0 }
 
         for path in possiblePaths {

@@ -25,11 +25,7 @@ brew install --cask airlingua
 ## 必要条件
 
 - macOS 14.0 (Sonoma) 以上
-- [llama.cpp](https://github.com/ggerganov/llama.cpp) がインストール済み
-
-```bash
-brew install llama.cpp
-```
+- llama.cpp は同梱済み（別途インストール不要）
 
 ## 使い方
 
