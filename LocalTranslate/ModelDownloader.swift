@@ -96,7 +96,7 @@ class ModelDownloader: NSObject, ObservableObject {
 
     private lazy var urlSession: URLSession = {
         let config = URLSessionConfiguration.default
-        return URLSession(configuration: config, delegate: self, delegateQueue: nil)
+        return URLSession(configuration: config, delegate: self, delegateQueue: OperationQueue.main)
     }()
 
     /// モデルをダウンロード
