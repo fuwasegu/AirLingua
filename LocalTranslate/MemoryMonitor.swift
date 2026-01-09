@@ -10,6 +10,7 @@ import Combine
 import Darwin
 
 /// アプリのメモリ使用量を監視するクラス
+@MainActor
 final class MemoryMonitor: ObservableObject {
     @Published var memoryUsageMB: Double = 0
     private var timer: Timer?
@@ -21,7 +22,9 @@ final class MemoryMonitor: ObservableObject {
     func startMonitoring() {
         updateMemoryUsage()
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            self?.updateMemoryUsage()
+            Task { @MainActor in
+                self?.updateMemoryUsage()
+            }
         }
     }
 
@@ -42,9 +45,7 @@ final class MemoryMonitor: ObservableObject {
 
         if result == KERN_SUCCESS {
             let bytes = info.resident_size
-            DispatchQueue.main.async {
-                self.memoryUsageMB = Double(bytes) / 1024 / 1024
-            }
+            self.memoryUsageMB = Double(bytes) / 1024 / 1024
         }
     }
 
@@ -57,6 +58,7 @@ final class MemoryMonitor: ObservableObject {
     }
 
     deinit {
-        stopMonitoring()
+        // deinit は nonisolated なので timer を直接操作
+        timer?.invalidate()
     }
 }

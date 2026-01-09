@@ -161,23 +161,19 @@ struct ContentView: View {
         guard !inputText.isEmpty else { return }
 
         isTranslating = true
-        Task {
+        Task { @MainActor in
             do {
                 let result = try await translationManager.translate(
                     inputText,
                     from: selectedSourceLanguage,
                     to: selectedTargetLanguage
                 )
-                await MainActor.run {
-                    outputText = result.translatedText
-                    isTranslating = false
-                }
+                outputText = result.translatedText
+                isTranslating = false
             } catch {
-                await MainActor.run {
-                    errorMessage = error.localizedDescription
-                    showingError = true
-                    isTranslating = false
-                }
+                errorMessage = error.localizedDescription
+                showingError = true
+                isTranslating = false
             }
         }
     }
@@ -271,8 +267,7 @@ struct SettingsView: View {
     @State private var refreshTrigger: Bool = false  // 再描画用トリガー
 
     private var modelType: ModelType {
-        get { ModelType(rawValue: modelTypeRaw) ?? .plamo }
-        set { modelTypeRaw = newValue.rawValue }
+        ModelType(rawValue: modelTypeRaw) ?? .plamo
     }
 
     /// ダウンロード済みモデルのリスト
@@ -341,7 +336,7 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     ForEach(0..<ModelDownloader.availableModels.count, id: \.self) { index in
                         let model = ModelDownloader.availableModels[index]
-                        let isDownloaded = downloader.isModelDownloaded(model) || (refreshTrigger && false)
+                        let isDownloaded = downloader.isModelDownloaded(model)
 
                         HStack {
                             Image(systemName: !isDownloaded && selectedDownloadIndex == index ? "circle.fill" : "circle")

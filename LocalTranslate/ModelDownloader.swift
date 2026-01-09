@@ -55,7 +55,11 @@ class ModelDownloader: NSObject, ObservableObject {
 
     /// モデル保存ディレクトリ
     var modelsDirectory: URL {
-        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        guard let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+            // フォールバック: ホームディレクトリを使用
+            return FileManager.default.homeDirectoryForCurrentUser
+                .appendingPathComponent("Library/Application Support/AirLingua/models")
+        }
         return appSupport.appendingPathComponent("AirLingua/models")
     }
 
@@ -152,6 +156,11 @@ class ModelDownloader: NSObject, ObservableObject {
     func cancel() {
         downloadTask?.cancel()
         downloadTask = nil
+        // continuation が残っている場合はキャンセルエラーで resume
+        if let continuation = continuation {
+            continuation.resume(throwing: DownloadError.cancelled)
+            self.continuation = nil
+        }
         isDownloading = false
     }
 
@@ -182,6 +191,9 @@ class ModelDownloader: NSObject, ObservableObject {
 
 // MARK: - URLSessionDownloadDelegate
 extension ModelDownloader: URLSessionDownloadDelegate {
+    // delegateQueue が OperationQueue.main なので、これらのメソッドはメインスレッドで呼ばれる
+    // ただし nonisolated なので、MainActor isolation を明示的に指定する必要がある
+
     nonisolated func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
         // 一時ファイルをコピー（元のファイルは自動削除される）
         let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".gguf")

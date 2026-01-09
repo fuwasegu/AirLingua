@@ -17,7 +17,7 @@ struct TranslationPopoverView: View {
         VStack(spacing: 0) {
             // ヘッダー
             HStack {
-                Text("PLaMo 翻訳")
+                Text("AirLingua")
                     .font(.headline)
                     .foregroundColor(.primary)
 
@@ -154,7 +154,7 @@ struct TranslationPopoverView: View {
             // ライセンス表記
             HStack {
                 Spacer()
-                Text("Built with PLaMo")
+                Text(translationManager.modelType.displayName)
                     .font(.caption2)
                     .foregroundColor(.secondary.opacity(0.7))
                 Spacer()
@@ -171,6 +171,7 @@ struct TranslationPopoverView: View {
         }
     }
 
+    @MainActor
     private func performTranslation() async {
         isTranslating = true
         errorMessage = nil
@@ -186,17 +187,13 @@ struct TranslationPopoverView: View {
                 from: nil,  // 自動検出
                 to: targetLanguage
             )
-            await MainActor.run {
-                translatedText = result.translatedText
-                duration = result.duration
-                detectedLanguage = result.detectedSourceLanguage
-                isTranslating = false
-            }
+            translatedText = result.translatedText
+            duration = result.duration
+            detectedLanguage = result.detectedSourceLanguage
+            isTranslating = false
         } catch {
-            await MainActor.run {
-                errorMessage = error.localizedDescription
-                isTranslating = false
-            }
+            errorMessage = error.localizedDescription
+            isTranslating = false
         }
     }
 

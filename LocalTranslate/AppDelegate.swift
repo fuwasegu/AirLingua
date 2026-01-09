@@ -22,7 +22,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// メモリ表示用メニューアイテム
     private var memoryMenuItem: NSMenuItem?
 
-    /// ポップオーバーウィンドウ
+    /// ポップオーバーウィンドウ（borderless なので strong 参照で保持が必要）
     private var popoverWindow: NSWindow?
     private var popoverHostingView: NSHostingView<TranslationPopoverView>?
 
@@ -107,7 +107,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// 設定ウィンドウ
-    private var settingsWindow: NSWindow?
+    private weak var settingsWindow: NSWindow?
 
     @objc private func openSettings() {
         // 既存のウィンドウがあれば前面に
@@ -566,9 +566,10 @@ class TranslationManager: ObservableObject {
 
 extension AppDelegate: NSMenuDelegate {
     /// メニューが開かれる直前に呼ばれる
+    /// Note: NSMenuDelegate は nonisolated なので、MainActor プロパティへのアクセスは Task 経由で行う。
+    /// AppKit はメインスレッドでコールバックを呼ぶため、Task は即座に実行される。
     nonisolated func menuWillOpen(_ menu: NSMenu) {
         Task { @MainActor in
-            // メモリ表示を更新
             memoryMenuItem?.title = "メモリ: \(memoryMonitor.formattedUsage)"
         }
     }
