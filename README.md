@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="Resources/AirLingua.png" width="200" alt="AirLingua">
+</p>
+
 # AirLingua
 
 ローカル LLM を使った macOS 向け翻訳アプリ。右クリックメニューから即座に翻訳できます。

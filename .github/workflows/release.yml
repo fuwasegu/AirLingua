@@ -25,6 +25,69 @@ jobs:
         run: |
           brew install llama.cpp
 
+      - name: Create App Icon
+        run: |
+          mkdir -p AppIcon.iconset
+
+          # Apply rounded corners (macOS style ~22% radius)
+          swift -e '
+          import AppKit
+          let src = NSImage(contentsOfFile: "Resources/AirLingua.png")!
+          let canvas = NSSize(width: 1024, height: 1024)
+          let scale: CGFloat = 0.80
+          let iconSize = NSSize(width: canvas.width * scale, height: canvas.height * scale)
+          let offset = (canvas.width - iconSize.width) / 2
+          let radius = iconSize.width * 0.22
+          let img = NSImage(size: canvas)
+          img.lockFocus()
+          NSColor.clear.setFill()
+          NSRect(origin: .zero, size: canvas).fill()
+          let rect = NSRect(x: offset, y: offset, width: iconSize.width, height: iconSize.height)
+          NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius).addClip()
+          src.draw(in: rect)
+          img.unlockFocus()
+          let data = img.tiffRepresentation.flatMap { NSBitmapImageRep(data: $0) }?.representation(using: .png, properties: [:])
+          try! data!.write(to: URL(fileURLWithPath: "/tmp/icon_processed.png"))
+          '
+
+          SRC="/tmp/icon_processed.png"
+          sips -z 16 16     "$SRC" --out AppIcon.iconset/icon_16x16.png
+          sips -z 32 32     "$SRC" --out AppIcon.iconset/icon_16x16@2x.png
+          sips -z 32 32     "$SRC" --out AppIcon.iconset/icon_32x32.png
+          sips -z 64 64     "$SRC" --out AppIcon.iconset/icon_32x32@2x.png
+          sips -z 128 128   "$SRC" --out AppIcon.iconset/icon_128x128.png
+          sips -z 256 256   "$SRC" --out AppIcon.iconset/icon_128x128@2x.png
+          sips -z 256 256   "$SRC" --out AppIcon.iconset/icon_256x256.png
+          sips -z 512 512   "$SRC" --out AppIcon.iconset/icon_256x256@2x.png
+          sips -z 512 512   "$SRC" --out AppIcon.iconset/icon_512x512.png
+          sips -z 1024 1024 "$SRC" --out AppIcon.iconset/icon_512x512@2x.png
+
+          # Copy to Asset Catalog
+          ICON_DIR="LocalTranslate/Assets.xcassets/AppIcon.appiconset"
+          mkdir -p "$ICON_DIR"
+          cp AppIcon.iconset/* "$ICON_DIR/"
+
+          # Create Contents.json
+          cat > "$ICON_DIR/Contents.json" << 'ICONJSON'
+          {
+            "images" : [
+              { "filename" : "icon_16x16.png", "idiom" : "mac", "scale" : "1x", "size" : "16x16" },
+              { "filename" : "icon_16x16@2x.png", "idiom" : "mac", "scale" : "2x", "size" : "16x16" },
+              { "filename" : "icon_32x32.png", "idiom" : "mac", "scale" : "1x", "size" : "32x32" },
+              { "filename" : "icon_32x32@2x.png", "idiom" : "mac", "scale" : "2x", "size" : "32x32" },
+              { "filename" : "icon_128x128.png", "idiom" : "mac", "scale" : "1x", "size" : "128x128" },
+              { "filename" : "icon_128x128@2x.png", "idiom" : "mac", "scale" : "2x", "size" : "128x128" },
+              { "filename" : "icon_256x256.png", "idiom" : "mac", "scale" : "1x", "size" : "256x256" },
+              { "filename" : "icon_256x256@2x.png", "idiom" : "mac", "scale" : "2x", "size" : "256x256" },
+              { "filename" : "icon_512x512.png", "idiom" : "mac", "scale" : "1x", "size" : "512x512" },
+              { "filename" : "icon_512x512@2x.png", "idiom" : "mac", "scale" : "2x", "size" : "512x512" }
+            ],
+            "info" : { "author" : "xcode", "version" : 1 }
+          }
+          ICONJSON
+
+          rm -rf AppIcon.iconset
+
       - name: Build
         run: |
           xcodebuild -project LocalTranslate.xcodeproj \
