@@ -1,0 +1,68 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest
+
+      - name: Build
+        run: |
+          xcodebuild -project LocalTranslate.xcodeproj \
+            -scheme LocalTranslate \
+            -configuration Release \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_REQUIRED=NO
+
+      - name: Prepare App Bundle
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          APP_PATH="build/Build/Products/Release/LocalTranslate.app"
+
+          # Rename to AirLingua.app
+          mv "$APP_PATH" "build/Build/Products/Release/AirLingua.app"
+
+          # Remove quarantine attribute
+          xattr -cr "build/Build/Products/Release/AirLingua.app"
+
+      - name: Create ZIP
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          cd build/Build/Products/Release
+          zip -r "AirLingua-${VERSION}.zip" "AirLingua.app"
+          mv "AirLingua-${VERSION}.zip" "$GITHUB_WORKSPACE/"
+          cd "$GITHUB_WORKSPACE"
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+          SHA256=$(shasum -a 256 "AirLingua-${VERSION}.zip" | cut -d ' ' -f 1)
+          echo "SHA256=${SHA256}" >> $GITHUB_ENV
+
+      - name: Upload to Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: AirLingua-${{ env.VERSION }}.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update Homebrew Tap
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          repository: fuwasegu/homebrew-tap
+          event-type: update-airlingua
+          client-payload: '{"version": "${{ env.VERSION }}", "sha256": "${{ env.SHA256 }}"}'
