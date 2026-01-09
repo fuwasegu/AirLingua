@@ -106,10 +106,20 @@ jobs:
           mv "$APP_PATH" "build/Build/Products/Release/AirLingua.app"
           APP_PATH="build/Build/Products/Release/AirLingua.app"
 
-          # Bundle llama-completion
+          # Bundle llama-completion with dependencies
           RESOURCES_DIR="$APP_PATH/Contents/Resources"
-          cp /opt/homebrew/bin/llama-completion "$RESOURCES_DIR/" || cp /usr/local/bin/llama-completion "$RESOURCES_DIR/"
+          LLAMA_BIN="/opt/homebrew/bin/llama-completion"
+          LLAMA_LIB="/opt/homebrew/lib/libllama.dylib"
+
+          # Copy binary
+          cp "$LLAMA_BIN" "$RESOURCES_DIR/"
           chmod +x "$RESOURCES_DIR/llama-completion"
+
+          # Copy library
+          cp "$LLAMA_LIB" "$RESOURCES_DIR/"
+
+          # Fix rpath to look in same directory
+          install_name_tool -change "@rpath/libllama.0.dylib" "@executable_path/libllama.dylib" "$RESOURCES_DIR/llama-completion"
 
           # Remove quarantine attribute
           xattr -cr "$APP_PATH"
