@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleName</key>
+    <string>AirLingua</string>
+    <key>CFBundleDisplayName</key>
+    <string>AirLingua</string>
+    <key>CFBundleIdentifier</key>
+    <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0.0</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleExecutable</key>
+    <string>$(EXECUTABLE_NAME)</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>$(MACOSX_DEPLOYMENT_TARGET)</string>
+    <key>NSHumanReadableCopyright</key>
+    <string>AirLingua - Local LLM Translation</string>
+    <key>LSApplicationCategoryType</key>
+    <string>public.app-category.productivity</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+
+    <!-- メニューバー常駐型アプリ（Dockに表示しない） -->
+    <key>LSUIElement</key>
+    <true/>
+
+    <!-- macOS Services (右クリックメニュー) -->
+    <key>NSServices</key>
+    <array>
+        <!-- 日本語に翻訳 -->
+        <dict>
+            <key>NSMenuItem</key>
+            <dict>
+                <key>default</key>
+                <string>AirLingua: 日本語に翻訳</string>
+            </dict>
+            <key>NSMessage</key>
+            <string>translateToJapanese</string>
+            <key>NSPortName</key>
+            <string>AirLingua</string>
+            <key>NSSendTypes</key>
+            <array>
+                <string>public.utf8-plain-text</string>
+            </array>
+        </dict>
+
+        <!-- 英語に翻訳 -->
+        <dict>
+            <key>NSMenuItem</key>
+            <dict>
+                <key>default</key>
+                <string>AirLingua: 英語に翻訳</string>
+            </dict>
+            <key>NSMessage</key>
+            <string>translateToEnglish</string>
+            <key>NSPortName</key>
+            <string>AirLingua</string>
+            <key>NSSendTypes</key>
+            <array>
+                <string>public.utf8-plain-text</string>
+            </array>
+        </dict>
+    </array>
+
+    <!-- Accessibility -->
+    <key>NSAppleEventsUsageDescription</key>
+    <string>AirLingua needs accessibility access.</string>
+</dict>
+</plist>
