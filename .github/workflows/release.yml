@@ -173,6 +173,11 @@ jobs:
             filename=$(basename "$file")
             echo "Fixing: $filename"
 
+            # Fix the library's own install name (ID) for dylibs
+            if [[ "$filename" == *.dylib ]]; then
+              install_name_tool -id "@loader_path/$filename" "$file" 2>/dev/null || true
+            fi
+
             # Get all @rpath and Homebrew absolute path references
             otool -L "$file" 2>/dev/null | tail -n +2 | awk '{print $1}' | while read dep; do
               if [[ "$dep" == @rpath/* ]] || [[ "$dep" == /opt/homebrew/* ]] || [[ "$dep" == /usr/local/* ]]; then
