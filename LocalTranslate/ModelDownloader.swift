@@ -60,6 +60,23 @@ class ModelDownloader: NSObject, ObservableObject {
             modelType: .alma,
             licenseNote: "✅ 商用利用可（MIT）"
         ),
+        // Qwen3 モデル（多言語対応・商用可）
+        ModelInfo(
+            name: "Qwen3-8B Q4_K_M",
+            fileName: "Qwen3-8B-Q4_K_M.gguf",
+            url: URL(string: "https://huggingface.co/Qwen/Qwen3-8B-GGUF/resolve/main/Qwen3-8B-Q4_K_M.gguf")!,
+            sizeDescription: "約 5.0 GB",
+            modelType: .qwen3_8b,
+            licenseNote: "✅ 商用利用可（Apache 2.0）"
+        ),
+        ModelInfo(
+            name: "Qwen3-4B-Instruct Q4_K_M",
+            fileName: "Qwen3-4B-Instruct-2507-Q4_K_M.gguf",
+            url: URL(string: "https://huggingface.co/unsloth/Qwen3-4B-Instruct-2507-GGUF/resolve/main/Qwen3-4B-Instruct-2507-Q4_K_M.gguf")!,
+            sizeDescription: "約 2.5 GB",
+            modelType: .qwen3_4b,
+            licenseNote: "✅ 商用利用可（Apache 2.0）"
+        ),
     ]
 
     /// モデル保存ディレクトリ

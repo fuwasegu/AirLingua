@@ -9,6 +9,8 @@ public final class PLaMoTranslator: TranslationService {
         case .plamo: return "PLaMo-2-translate (GGUF)"
         case .elyza: return "ELYZA-JP-8B (GGUF)"
         case .alma: return "ALMA-7B-Ja (GGUF)"
+        case .qwen3_8b: return "Qwen3-8B (GGUF)"
+        case .qwen3_4b: return "Qwen3-4B (GGUF)"
         }
     }
 
@@ -175,6 +177,9 @@ public final class PLaMoTranslator: TranslationService {
             case .alma:
                 // </s> のみ。改行は停止トークンにしない（複数文対応）
                 arguments += ["-r", "</s>"]
+            case .qwen3_8b, .qwen3_4b:
+                // Qwen3 は ChatML 形式。im_end が停止トークン
+                arguments += ["-r", "<|im_end|>"]
             }
 
             process.arguments = arguments
@@ -237,11 +242,24 @@ public final class PLaMoTranslator: TranslationService {
         case .alma:
             // ALMA-7B-Ja の翻訳プロンプト形式
             // https://huggingface.co/webbigdata/ALMA-7B-Ja
+            // 改行をスペースに置換（改行があると途中で止まる問題の対策）
+            let flatText = text.replacingOccurrences(of: "\n", with: " ")
             if target == .japanese {
-                return "Translate this from English to Japanese:\nEnglish: \(text)\nJapanese:"
+                return "Translate this from English to Japanese:\nEnglish: \(flatText)\nJapanese:"
             } else {
-                return "Translate this from Japanese to English:\nJapanese: \(text)\nEnglish:"
+                return "Translate this from Japanese to English:\nJapanese: \(flatText)\nEnglish:"
             }
+
+        case .qwen3_8b, .qwen3_4b:
+            // Qwen3 ChatML 形式
+            let systemPrompt = "You are a translator. Translate the given text accurately and completely. Output only the translation without any explanations or preambles."
+            let userPrompt: String
+            if target == .japanese {
+                userPrompt = "Translate the following English text to Japanese:\n\n\(text)"
+            } else {
+                userPrompt = "Translate the following Japanese text to English:\n\n\(text)"
+            }
+            return "<|im_start|>system\n\(systemPrompt)<|im_end|>\n<|im_start|>user\n\(userPrompt)<|im_end|>\n<|im_start|>assistant\n"
         }
     }
 
@@ -276,6 +294,12 @@ public final class PLaMoTranslator: TranslationService {
         case .alma:
             // ALMA の停止トークンを除去
             result = result.replacingOccurrences(of: "</s>", with: "")
+
+        case .qwen3_8b, .qwen3_4b:
+            // Qwen3 の ChatML トークンを除去
+            result = result.replacingOccurrences(of: "<|im_end|>", with: "")
+            result = result.replacingOccurrences(of: "<|im_start|>", with: "")
+            result = result.replacingOccurrences(of: "<|endoftext|>", with: "")
         }
 
         return result.trimmingCharacters(in: .whitespacesAndNewlines)
