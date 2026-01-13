@@ -260,7 +260,7 @@ struct LanguagePicker: View {
 /// 設定ビュー
 struct SettingsView: View {
     @EnvironmentObject var translationManager: TranslationManager
-    @StateObject private var downloader = ModelDownloader()
+    @EnvironmentObject var downloader: ModelDownloader
     @AppStorage("modelPath") private var modelPath: String = ""
     @AppStorage("modelType") private var modelTypeRaw: String = ModelType.plamo.rawValue
     @State private var selectedDownloadIndex: Int = 0
