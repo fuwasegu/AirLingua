@@ -14,6 +14,7 @@ import Combine
 @MainActor
 class AppDelegate: NSObject, NSApplicationDelegate {
     let translationManager = TranslationManager()
+    let modelDownloader = ModelDownloader()
     private let memoryMonitor = MemoryMonitor()
 
     /// メニューバーアイテム
@@ -120,6 +121,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // 設定ビューを作成
         let settingsView = SettingsView()
             .environmentObject(translationManager)
+            .environmentObject(modelDownloader)
 
         let hostingView = NSHostingView(rootView: settingsView)
 
