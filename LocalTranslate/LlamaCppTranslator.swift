@@ -116,8 +116,11 @@ public final class PLaMoTranslator: TranslationService {
         // 原文言語を検出または指定
         let srcLang = sourceLanguage ?? detectLanguage(trimmedText)
 
+        // 空行を正規化（連続する改行を1つに）- モデルが途中で止まるのを防ぐ
+        let normalizedText = normalizeWhitespace(trimmedText)
+
         // プロンプトを構築
-        let prompt = buildPrompt(text: trimmedText, source: srcLang, target: targetLanguage)
+        let prompt = buildPrompt(text: normalizedText, source: srcLang, target: targetLanguage)
 
         // llama-completion を実行
         let response = try await runLlamaCompletion(prompt: prompt)
@@ -276,6 +279,24 @@ public final class PLaMoTranslator: TranslationService {
         }
 
         return result.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// 空白を正規化（連続する改行を1つに、段落構造は維持）
+    private func normalizeWhitespace(_ text: String) -> String {
+        // 2つ以上の連続する改行を1つの改行に置換
+        // これにより空行があっても翻訳が途中で止まらなくなる
+        var result = text
+
+        // \r\n や \r を \n に統一
+        result = result.replacingOccurrences(of: "\r\n", with: "\n")
+        result = result.replacingOccurrences(of: "\r", with: "\n")
+
+        // 3つ以上の連続する改行を2つに（段落区切りは維持）
+        while result.contains("\n\n\n") {
+            result = result.replacingOccurrences(of: "\n\n\n", with: "\n\n")
+        }
+
+        return result
     }
 
     /// 簡易的な言語検出（日本語/英語のみ）
