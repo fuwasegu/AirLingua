@@ -8,6 +8,7 @@ public final class PLaMoTranslator: TranslationService {
         switch modelType {
         case .plamo: return "PLaMo-2-translate (GGUF)"
         case .elyza: return "ELYZA-JP-8B (GGUF)"
+        case .alma: return "ALMA-7B-Ja (GGUF)"
         }
     }
 
@@ -167,6 +168,8 @@ public final class PLaMoTranslator: TranslationService {
                 arguments += ["-r", "<|plamo:op|>"]
             case .elyza:
                 arguments += ["-r", "<|eot_id|>"]
+            case .alma:
+                arguments += ["-r", "</s>", "-r", "\n\n"]
             }
 
             process.arguments = arguments
@@ -225,6 +228,15 @@ public final class PLaMoTranslator: TranslationService {
                 userPrompt = "日本語→英語:\n\(text)"
             }
             return "<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n\(systemPrompt)<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n\(userPrompt)<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
+
+        case .alma:
+            // ALMA-7B-Ja の翻訳プロンプト形式
+            // https://huggingface.co/webbigdata/ALMA-7B-Ja
+            if target == .japanese {
+                return "Translate this from English to Japanese:\nEnglish: \(text)\nJapanese:"
+            } else {
+                return "Translate this from Japanese to English:\nJapanese: \(text)\nEnglish:"
+            }
         }
     }
 
@@ -255,6 +267,10 @@ public final class PLaMoTranslator: TranslationService {
                     result = String(result[range.upperBound...])
                 }
             }
+
+        case .alma:
+            // ALMA の停止トークンを除去
+            result = result.replacingOccurrences(of: "</s>", with: "")
         }
 
         return result.trimmingCharacters(in: .whitespacesAndNewlines)

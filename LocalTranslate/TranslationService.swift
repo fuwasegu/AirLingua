@@ -47,6 +47,7 @@ public enum Language: String, CaseIterable, Identifiable {
 public enum ModelType: String, CaseIterable, Identifiable {
     case plamo = "plamo"
     case elyza = "elyza"
+    case alma = "alma"
 
     public var id: String { rawValue }
 
@@ -54,6 +55,7 @@ public enum ModelType: String, CaseIterable, Identifiable {
         switch self {
         case .plamo: return "PLaMo-2-translate"
         case .elyza: return "ELYZA-JP-8B"
+        case .alma: return "ALMA-7B-Ja"
         }
     }
 
@@ -61,6 +63,7 @@ public enum ModelType: String, CaseIterable, Identifiable {
         switch self {
         case .plamo: return "PFN製 翻訳特化モデル（個人利用のみ）"
         case .elyza: return "ELYZA製 汎用日本語モデル（商用可）"
+        case .alma: return "翻訳特化モデル（商用可）"
         }
     }
 
@@ -68,6 +71,7 @@ public enum ModelType: String, CaseIterable, Identifiable {
         switch self {
         case .plamo: return "⚠️ PLaMo Community License - 個人利用のみ"
         case .elyza: return "✅ Llama 3 Community License - 商用利用可"
+        case .alma: return "✅ MIT License - 商用利用可"
         }
     }
 }

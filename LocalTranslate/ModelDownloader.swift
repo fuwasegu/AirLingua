@@ -44,12 +44,21 @@ class ModelDownloader: NSObject, ObservableObject {
         ),
         // ELYZA モデル（商用可）
         ModelInfo(
-            name: "ELYZA-JP-8B Q4_K_M（推奨）",
+            name: "ELYZA-JP-8B Q4_K_M",
             fileName: "Llama-3-ELYZA-JP-8B-q4_k_m.gguf",
             url: URL(string: "https://huggingface.co/elyza/Llama-3-ELYZA-JP-8B-GGUF/resolve/main/Llama-3-ELYZA-JP-8B-q4_k_m.gguf")!,
             sizeDescription: "約 4.9 GB",
             modelType: .elyza,
             licenseNote: "✅ 商用利用可"
+        ),
+        // ALMA モデル（翻訳特化・商用可）
+        ModelInfo(
+            name: "ALMA-7B-Ja Q4_K_M（推奨）",
+            fileName: "webbigdata-ALMA-7B-Ja-q4_K_M.gguf",
+            url: URL(string: "https://huggingface.co/mmnga/webbigdata-ALMA-7B-Ja-gguf/resolve/main/webbigdata-ALMA-7B-Ja-q4_K_M.gguf")!,
+            sizeDescription: "約 4.1 GB",
+            modelType: .alma,
+            licenseNote: "✅ 商用利用可（MIT）"
         ),
     ]
 
