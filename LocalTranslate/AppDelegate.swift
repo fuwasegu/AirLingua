@@ -54,6 +54,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         translationManager.unloadModel()
     }
 
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        return false
+    }
+
     // MARK: - Status Bar
 
     private func setupStatusBar() {
