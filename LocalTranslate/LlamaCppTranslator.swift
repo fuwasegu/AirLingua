@@ -251,13 +251,13 @@ public final class PLaMoTranslator: TranslationService {
             }
 
         case .qwen3_8b, .qwen3_4b:
-            // Qwen3 ChatML 形式
+            // Qwen3 ChatML 形式（/no_think で思考モードを無効化）
             let systemPrompt = "You are a translator. Translate the given text accurately and completely. Output only the translation without any explanations or preambles."
             let userPrompt: String
             if target == .japanese {
-                userPrompt = "Translate the following English text to Japanese:\n\n\(text)"
+                userPrompt = "Translate the following English text to Japanese:\n\n\(text) /no_think"
             } else {
-                userPrompt = "Translate the following Japanese text to English:\n\n\(text)"
+                userPrompt = "Translate the following Japanese text to English:\n\n\(text) /no_think"
             }
             return "<|im_start|>system\n\(systemPrompt)<|im_end|>\n<|im_start|>user\n\(userPrompt)<|im_end|>\n<|im_start|>assistant\n"
         }
@@ -300,6 +300,10 @@ public final class PLaMoTranslator: TranslationService {
             result = result.replacingOccurrences(of: "<|im_end|>", with: "")
             result = result.replacingOccurrences(of: "<|im_start|>", with: "")
             result = result.replacingOccurrences(of: "<|endoftext|>", with: "")
+            // 万が一 think タグが出た場合は除去
+            if let thinkRange = result.range(of: "<think>.*?</think>\\s*", options: .regularExpression) {
+                result = result.replacingCharacters(in: thinkRange, with: "")
+            }
         }
 
         return result.trimmingCharacters(in: .whitespacesAndNewlines)
