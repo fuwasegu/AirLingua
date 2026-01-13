@@ -28,6 +28,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var popoverHostingView: NSHostingView<TranslationPopoverView>?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // メニューバー常駐アプリとして設定
+        NSApp.setActivationPolicy(.accessory)
+
         // メニューバーアイコンを設定
         setupStatusBar()
 
@@ -51,10 +54,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        print("DEBUG: applicationWillTerminate called")
         translationManager.unloadModel()
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        print("DEBUG: applicationShouldTerminateAfterLastWindowClosed called, returning false")
         return false
     }
 
@@ -111,12 +116,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem?.menu = menu
     }
 
-    /// 設定ウィンドウ
-    private weak var settingsWindow: NSWindow?
+    /// 設定ウィンドウ（strong参照で保持）
+    private var settingsWindow: NSWindow?
 
     @objc private func openSettings() {
         // 既存のウィンドウがあれば前面に
-        if let window = settingsWindow, window.isVisible {
+        if let window = settingsWindow {
             window.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
             return
@@ -137,6 +142,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         )
         window.title = "AirLingua 設定"
         window.contentView = hostingView
+        window.isReleasedWhenClosed = false  // 閉じても解放しない
         window.center()
         window.makeKeyAndOrderFront(nil)
 
@@ -246,6 +252,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.backgroundColor = .clear
         window.level = .floating
         window.hasShadow = true
+        window.isReleasedWhenClosed = false
 
         window.setFrameOrigin(NSPoint(
             x: position.x - 75,
@@ -367,6 +374,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.level = .floating
         window.hasShadow = true
         window.isMovableByWindowBackground = true
+        window.isReleasedWhenClosed = false
         window.minSize = NSSize(width: 300, height: 150)  // 最小サイズ
 
         // 指定位置に表示（ウィンドウ中央がマウス位置付近に）
@@ -419,6 +427,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         window.level = .floating
         window.hasShadow = true
         window.isMovableByWindowBackground = true
+        window.isReleasedWhenClosed = false
 
         // マウス位置に表示
         let mouseLocation = NSEvent.mouseLocation
