@@ -12,10 +12,14 @@ struct LocalTranslateApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var body: some Scene {
-        // メニューバー常駐型なのでウィンドウは表示しない
-        Settings {
-            SettingsView()
-                .environmentObject(appDelegate.translationManager)
+        // メニューバー常駐型 - MenuBarExtra でアプリを維持
+        // 実際のメニューは AppDelegate で管理
+        // 設定画面も AppDelegate.openSettings() で管理
+        MenuBarExtra {
+            EmptyView()
+        } label: {
+            EmptyView()
         }
+        .menuBarExtraStyle(.menu)
     }
 }
