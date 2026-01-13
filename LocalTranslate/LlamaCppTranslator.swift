@@ -167,9 +167,11 @@ public final class PLaMoTranslator: TranslationService {
             case .plamo:
                 arguments += ["-r", "<|plamo:op|>"]
             case .elyza:
+                // eot_id は会話終了トークンなので、これだけで十分
                 arguments += ["-r", "<|eot_id|>"]
             case .alma:
-                arguments += ["-r", "</s>", "-r", "\n\n"]
+                // </s> のみ。改行は停止トークンにしない（複数文対応）
+                arguments += ["-r", "</s>"]
             }
 
             process.arguments = arguments
@@ -220,12 +222,12 @@ public final class PLaMoTranslator: TranslationService {
         case .elyza:
             // ELYZA Llama 3 のチャットテンプレート形式
             // https://huggingface.co/elyza/Llama-3-ELYZA-JP-8B-GGUF
-            let systemPrompt = "あなたは翻訳APIです。入力テキストの翻訳のみを出力してください。「翻訳結果」「以下」などの前置きや説明は絶対に付けないでください。"
+            let systemPrompt = "あなたは翻訳APIです。入力された全文を翻訳して出力してください。途中で止めず、最後まで翻訳してください。「翻訳結果」「以下」などの前置きや説明は絶対に付けないでください。"
             let userPrompt: String
             if target == .japanese {
-                userPrompt = "英語→日本語:\n\(text)"
+                userPrompt = "以下の英語を全て日本語に翻訳してください:\n\(text)"
             } else {
-                userPrompt = "日本語→英語:\n\(text)"
+                userPrompt = "以下の日本語を全て英語に翻訳してください:\n\(text)"
             }
             return "<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n\(systemPrompt)<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n\(userPrompt)<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
 
