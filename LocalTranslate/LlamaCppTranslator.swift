@@ -2,20 +2,12 @@ import Foundation
 
 /// llama-completion を使用した翻訳サービス
 /// llama.cpp の CLI ツールを Process で呼び出す方式
-/// PLaMo-2-translate と ELYZA-JP をサポート
-public final class PLaMoTranslator: TranslationService {
-    public var name: String {
-        switch modelType {
-        case .plamo: return "PLaMo-2-translate (GGUF)"
-        case .elyza: return "ELYZA-JP-8B (GGUF)"
-        case .alma: return "ALMA-7B-Ja (GGUF)"
-        case .qwen3_8b: return "Qwen3-8B (GGUF)"
-        case .qwen3_4b: return "Qwen3-4B (GGUF)"
-        }
-    }
+/// ModelAdapter パターンで複数モデルをサポート
+public final class LlamaCppTranslator: TranslationService {
+    public var name: String { adapter.name }
 
     private let modelPath: String
-    private let modelType: ModelType
+    private let adapter: ModelAdapter
     private var llamaCompletionPath: String
 
     /// 推論パラメータ
@@ -37,13 +29,12 @@ public final class PLaMoTranslator: TranslationService {
     /// 初期化
     /// - Parameters:
     ///   - modelPath: GGUF モデルファイルのパス
-    ///   - modelType: モデルタイプ（PLaMo or Elyza）
+    ///   - modelType: モデルタイプ
     ///   - config: 推論設定
     public init(modelPath: String, modelType: ModelType = .plamo, config: Config = .default) {
         self.modelPath = modelPath
-        self.modelType = modelType
+        self.adapter = createModelAdapter(for: modelType)
         self.config = config
-        // llama-completion のパスを探す
         self.llamaCompletionPath = Self.findLlamaCompletion() ?? "/opt/homebrew/bin/llama-completion"
     }
 
@@ -72,7 +63,7 @@ public final class PLaMoTranslator: TranslationService {
         guard FileManager.default.fileExists(atPath: modelPath) else {
             throw TranslationError.modelLoadFailed(
                 underlying: NSError(
-                    domain: "PLaMoTranslator",
+                    domain: "LlamaCppTranslator",
                     code: 1,
                     userInfo: [NSLocalizedDescriptionKey: "モデルファイルが見つかりません: \(modelPath)"]
                 )
@@ -83,15 +74,13 @@ public final class PLaMoTranslator: TranslationService {
         guard FileManager.default.isExecutableFile(atPath: llamaCompletionPath) else {
             throw TranslationError.modelLoadFailed(
                 underlying: NSError(
-                    domain: "PLaMoTranslator",
+                    domain: "LlamaCppTranslator",
                     code: 2,
                     userInfo: [NSLocalizedDescriptionKey: "llama-completion が見つかりません。\nbrew install llama.cpp でインストールしてください。"]
                 )
             )
         }
 
-        // 簡単なテスト実行でモデルが読み込めるか確認
-        // (実際の読み込みは translate 時に行う)
         modelLoaded = true
     }
 
@@ -118,19 +107,19 @@ public final class PLaMoTranslator: TranslationService {
         // 原文言語を検出または指定
         let srcLang = sourceLanguage ?? detectLanguage(trimmedText)
 
-        // 空行を正規化（連続する改行を1つに）- モデルが途中で止まるのを防ぐ
-        let normalizedText = normalizeWhitespace(trimmedText)
+        // アダプターで入力を正規化
+        let normalizedText = adapter.normalizeInput(trimmedText)
 
-        // プロンプトを構築
-        let prompt = buildPrompt(text: normalizedText, source: srcLang, target: targetLanguage)
+        // アダプターでプロンプトを構築
+        let prompt = adapter.buildPrompt(text: normalizedText, source: srcLang, target: targetLanguage)
 
         // llama-completion を実行
         let response = try await runLlamaCompletion(prompt: prompt)
 
         let duration = Date().timeIntervalSince(startTime)
 
-        // 出力を整形（モデルタイプに応じて不要な文字列を除去）
-        let cleanedResponse = cleanOutput(response)
+        // アダプターで出力をクリーニング
+        let cleanedResponse = adapter.cleanOutput(response)
 
         return TranslationResult(
             translatedText: cleanedResponse,
@@ -144,42 +133,30 @@ public final class PLaMoTranslator: TranslationService {
 
     /// llama-completion を実行（バックグラウンドスレッドで）
     private func runLlamaCompletion(prompt: String) async throws -> String {
-        // メインスレッドをブロックしないようにバックグラウンドで実行
         let modelPath = self.modelPath
         let llamaPath = self.llamaCompletionPath
         let maxTokens = self.config.maxTokens
         let contextSize = self.config.contextSize
         let temperature = self.config.temperature
-        let modelType = self.modelType
+        let stopTokens = self.adapter.stopTokens
 
         return try await Task.detached(priority: .userInitiated) {
             let process = Process()
             process.executableURL = URL(fileURLWithPath: llamaPath)
 
-            // モデルタイプに応じた引数を構築
             var arguments = [
                 "-m", modelPath,
                 "-p", prompt,
                 "-n", String(maxTokens),
                 "-c", String(contextSize),
                 "--temp", String(temperature),
-                "--no-display-prompt",  // プロンプトを出力に含めない
-                "--no-conversation",    // 対話モードを無効化
+                "--no-display-prompt",
+                "--no-conversation",
             ]
 
-            // モデル固有の停止トークン
-            switch modelType {
-            case .plamo:
-                arguments += ["-r", "<|plamo:op|>"]
-            case .elyza:
-                // eot_id は会話終了トークンなので、これだけで十分
-                arguments += ["-r", "<|eot_id|>"]
-            case .alma:
-                // </s> のみ。改行は停止トークンにしない（複数文対応）
-                arguments += ["-r", "</s>"]
-            case .qwen3_8b, .qwen3_4b:
-                // Qwen3 は ChatML 形式。im_end が停止トークン
-                arguments += ["-r", "<|im_end|>"]
+            // アダプターから停止トークンを追加
+            for token in stopTokens {
+                arguments += ["-r", token]
             }
 
             process.arguments = arguments
@@ -219,123 +196,15 @@ public final class PLaMoTranslator: TranslationService {
         }.value
     }
 
-    /// プロンプトを構築（モデルタイプに応じて）
-    private func buildPrompt(text: String, source: Language, target: Language) -> String {
-        switch modelType {
-        case .plamo:
-            // PLaMo-2-translate の正しいプロンプト形式
-            // https://huggingface.co/pfnet/plamo-2-translate
-            return "<|plamo:op|>dataset translation\n<|plamo:op|>input lang=\(source.rawValue)\n\(text)\n<|plamo:op|>output lang=\(target.rawValue)\n"
-
-        case .elyza:
-            // ELYZA Llama 3 のチャットテンプレート形式
-            // https://huggingface.co/elyza/Llama-3-ELYZA-JP-8B-GGUF
-            let systemPrompt = "あなたは翻訳APIです。入力された全文を翻訳して出力してください。途中で止めず、最後まで翻訳してください。「翻訳結果」「以下」などの前置きや説明は絶対に付けないでください。"
-            let userPrompt: String
-            if target == .japanese {
-                userPrompt = "以下の英語を全て日本語に翻訳してください:\n\(text)"
-            } else {
-                userPrompt = "以下の日本語を全て英語に翻訳してください:\n\(text)"
-            }
-            return "<|begin_of_text|><|start_header_id|>system<|end_header_id|>\n\n\(systemPrompt)<|eot_id|><|start_header_id|>user<|end_header_id|>\n\n\(userPrompt)<|eot_id|><|start_header_id|>assistant<|end_header_id|>\n\n"
-
-        case .alma:
-            // ALMA-7B-Ja の翻訳プロンプト形式
-            // https://huggingface.co/webbigdata/ALMA-7B-Ja
-            // 改行をスペースに置換（改行があると途中で止まる問題の対策）
-            let flatText = text.replacingOccurrences(of: "\n", with: " ")
-            if target == .japanese {
-                return "Translate this from English to Japanese:\nEnglish: \(flatText)\nJapanese:"
-            } else {
-                return "Translate this from Japanese to English:\nJapanese: \(flatText)\nEnglish:"
-            }
-
-        case .qwen3_8b, .qwen3_4b:
-            // Qwen3 ChatML 形式（/no_think で思考モードを無効化）
-            let systemPrompt = "You are a translator. Translate the given text accurately and completely. Output only the translation without any explanations or preambles."
-            let userPrompt: String
-            if target == .japanese {
-                userPrompt = "Translate the following English text to Japanese:\n\n\(text) /no_think"
-            } else {
-                userPrompt = "Translate the following Japanese text to English:\n\n\(text) /no_think"
-            }
-            return "<|im_start|>system\n\(systemPrompt)<|im_end|>\n<|im_start|>user\n\(userPrompt)<|im_end|>\n<|im_start|>assistant\n"
-        }
-    }
-
-    /// 出力をクリーニング（モデルタイプに応じて）
-    private func cleanOutput(_ output: String) -> String {
-        var result = output
-
-        // 共通のクリーニング
-        result = result.replacingOccurrences(of: "[end of text]", with: "")
-
-        // モデル固有のトークンを除去
-        switch modelType {
-        case .plamo:
-            result = result.replacingOccurrences(of: "<|plamo:op|>", with: "")
-
-        case .elyza:
-            result = result.replacingOccurrences(of: "<|eot_id|>", with: "")
-            result = result.replacingOccurrences(of: "<|end_of_text|>", with: "")
-            // ELYZA が付けがちな前置きを除去
-            let prefixPatterns = [
-                "^以下[がは]翻訳結果です[。：:]*\\s*",
-                "^翻訳結果[：:]*\\s*",
-                "^以下[がは].*?翻訳.*?です[。：:]*\\s*",
-                "^.*?を翻訳しました[。：:]*\\s*",
-            ]
-            for pattern in prefixPatterns {
-                if let range = result.range(of: pattern, options: .regularExpression) {
-                    result = String(result[range.upperBound...])
-                }
-            }
-
-        case .alma:
-            // ALMA の停止トークンを除去
-            result = result.replacingOccurrences(of: "</s>", with: "")
-
-        case .qwen3_8b, .qwen3_4b:
-            // Qwen3 の ChatML トークンを除去
-            result = result.replacingOccurrences(of: "<|im_end|>", with: "")
-            result = result.replacingOccurrences(of: "<|im_start|>", with: "")
-            result = result.replacingOccurrences(of: "<|endoftext|>", with: "")
-            // 万が一 think タグが出た場合は除去
-            if let thinkRange = result.range(of: "<think>.*?</think>\\s*", options: .regularExpression) {
-                result = result.replacingCharacters(in: thinkRange, with: "")
-            }
-        }
-
-        return result.trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    /// 空白を正規化（連続する改行を1つに、段落構造は維持）
-    private func normalizeWhitespace(_ text: String) -> String {
-        // 2つ以上の連続する改行を1つの改行に置換
-        // これにより空行があっても翻訳が途中で止まらなくなる
-        var result = text
-
-        // \r\n や \r を \n に統一
-        result = result.replacingOccurrences(of: "\r\n", with: "\n")
-        result = result.replacingOccurrences(of: "\r", with: "\n")
-
-        // 3つ以上の連続する改行を2つに（段落区切りは維持）
-        while result.contains("\n\n\n") {
-            result = result.replacingOccurrences(of: "\n\n\n", with: "\n\n")
-        }
-
-        return result
-    }
-
     /// 簡易的な言語検出（日本語/英語のみ）
     private func detectLanguage(_ text: String) -> Language {
-        // 日本語文字（ひらがな、カタカナ、漢字）が含まれていれば日本語
         let japaneseRange = text.range(of: "[\\p{Hiragana}\\p{Katakana}\\p{Han}]", options: .regularExpression)
         if japaneseRange != nil {
             return .japanese
         }
-
-        // それ以外は英語
         return .english
     }
 }
+
+// MARK: - 後方互換性のための型エイリアス
+public typealias PLaMoTranslator = LlamaCppTranslator

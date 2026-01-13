@@ -53,7 +53,7 @@ class ModelDownloader: NSObject, ObservableObject {
         ),
         // ALMA モデル（翻訳特化・商用可）
         ModelInfo(
-            name: "ALMA-7B-Ja Q4_K_M（推奨）",
+            name: "ALMA-7B-Ja Q4_K_M",
             fileName: "webbigdata-ALMA-7B-Ja-q4_K_M.gguf",
             url: URL(string: "https://huggingface.co/mmnga/webbigdata-ALMA-7B-Ja-gguf/resolve/main/webbigdata-ALMA-7B-Ja-q4_K_M.gguf")!,
             sizeDescription: "約 4.1 GB",
@@ -62,7 +62,7 @@ class ModelDownloader: NSObject, ObservableObject {
         ),
         // Qwen3 モデル（多言語対応・商用可）
         ModelInfo(
-            name: "Qwen3-8B Q4_K_M",
+            name: "Qwen3-8B Q4_K_M（推奨）",
             fileName: "Qwen3-8B-Q4_K_M.gguf",
             url: URL(string: "https://huggingface.co/Qwen/Qwen3-8B-GGUF/resolve/main/Qwen3-8B-Q4_K_M.gguf")!,
             sizeDescription: "約 5.0 GB",
