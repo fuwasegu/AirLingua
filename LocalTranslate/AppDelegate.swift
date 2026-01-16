@@ -23,10 +23,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// メモリ表示用メニューアイテム
     private var memoryMenuItem: NSMenuItem?
 
-    /// ポップオーバーウィンドウ（borderless なので strong 参照で保持が必要）
-    private var popoverWindow: NSWindow?
-    private var popoverHostingView: NSHostingView<TranslationPopoverView>?
-
     func applicationDidFinishLaunching(_ notification: Notification) {
         // メニューバー常駐アプリとして設定
         NSApp.setActivationPolicy(.accessory)
@@ -281,17 +277,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// 結果ウィンドウ
     private var resultWindow: NSPanel?
+    /// 現在表示中の翻訳結果テキスト
+    private var currentResultText: String = ""
 
     /// 結果ウィンドウを安全に閉じる
     private func closeResultWindow() {
         resultWindow?.orderOut(nil)
         resultWindow = nil
+        currentResultText = ""
     }
 
     /// クイック翻訳結果を表示（純粋な AppKit）
     private func showQuickResult(_ text: String, at position: NSPoint) {
         // 既存の結果ウィンドウを閉じる
         closeResultWindow()
+
+        // 翻訳結果を保存（コピー用）
+        currentResultText = text
 
         let windowWidth: CGFloat = 400
         let windowHeight: CGFloat = 250
@@ -319,6 +321,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         headerLabel.textColor = .secondaryLabelColor
         headerLabel.autoresizingMask = [.minYMargin]
         containerView.addSubview(headerLabel)
+
+        // コピーボタン（右上、閉じるボタンの左）
+        let copyButton = NSButton(frame: NSRect(x: windowWidth - 80, y: headerY, width: 60, height: 20))
+        copyButton.bezelStyle = .inline
+        copyButton.isBordered = false
+        copyButton.title = "Copy"
+        copyButton.image = NSImage(systemSymbolName: "doc.on.doc", accessibilityDescription: "コピー")
+        copyButton.imagePosition = .imageLeading
+        copyButton.contentTintColor = .controlAccentColor
+        copyButton.font = NSFont.systemFont(ofSize: 11)
+        copyButton.target = self
+        copyButton.action = #selector(copyResultButtonClicked)
+        copyButton.autoresizingMask = [.minXMargin, .minYMargin]
+        containerView.addSubview(copyButton)
 
         // 閉じるボタン（右上に固定）
         let closeButton = NSButton(frame: NSRect(x: windowWidth - 32, y: headerY, width: 20, height: 20))
@@ -391,88 +407,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         closeResultWindow()
     }
 
-    // MARK: - Popover
+    @objc private func copyResultButtonClicked(_ sender: NSButton) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(currentResultText, forType: .string)
 
-    /// イベントモニター
-    private var eventMonitor: Any?
+        // ボタンのテキストを一時的に変更してフィードバック
+        let originalTitle = sender.title
+        sender.title = "Copied!"
+        sender.image = NSImage(systemSymbolName: "checkmark", accessibilityDescription: nil)
+        sender.contentTintColor = .systemGreen
 
-    /// 翻訳ポップオーバーを表示
-    func showPopover(with text: String, targetLanguage: Language) {
-        // 既存のポップオーバーを閉じる
-        closePopover()
-
-        // ポップオーバービューを作成
-        let popoverView = TranslationPopoverView(
-            inputText: text,
-            targetLanguage: targetLanguage,
-            translationManager: translationManager,
-            onClose: { [weak self] in
-                self?.closePopover()
-            }
-        )
-
-        let hostingView = NSHostingView(rootView: popoverView)
-        hostingView.frame = NSRect(x: 0, y: 0, width: 400, height: 300)
-
-        // ウィンドウを作成
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 400, height: 300),
-            styleMask: [.borderless, .fullSizeContentView],
-            backing: .buffered,
-            defer: false
-        )
-        window.contentView = hostingView
-        window.isOpaque = false
-        window.backgroundColor = .clear
-        window.level = .floating
-        window.hasShadow = true
-        window.isMovableByWindowBackground = true
-        window.isReleasedWhenClosed = false
-
-        // マウス位置に表示
-        let mouseLocation = NSEvent.mouseLocation
-        let screenFrame = NSScreen.main?.frame ?? .zero
-
-        var windowOrigin = NSPoint(
-            x: mouseLocation.x - 200,  // ウィンドウの中央をマウス位置に
-            y: mouseLocation.y - 320   // マウスの少し下に表示
-        )
-
-        // 画面外にはみ出さないように調整
-        windowOrigin.x = max(10, min(windowOrigin.x, screenFrame.width - 410))
-        windowOrigin.y = max(10, min(windowOrigin.y, screenFrame.height - 310))
-
-        window.setFrameOrigin(windowOrigin)
-        window.makeKeyAndOrderFront(nil)
-
-        self.popoverWindow = window
-        self.popoverHostingView = hostingView
-
-        // ウィンドウの外をクリックしたら閉じる
-        eventMonitor = NSEvent.addLocalMonitorForEvents(matching: .leftMouseDown) { [weak self] event in
-            if let window = self?.popoverWindow,
-               !window.frame.contains(NSEvent.mouseLocation) {
-                self?.closePopover()
-            }
-            return event
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            sender.title = originalTitle
+            sender.image = NSImage(systemSymbolName: "doc.on.doc", accessibilityDescription: nil)
+            sender.contentTintColor = .controlAccentColor
         }
     }
 
-    /// ポップオーバーを閉じる
-    func closePopover() {
-        // イベントモニターを解除
-        if let monitor = eventMonitor {
-            NSEvent.removeMonitor(monitor)
-            eventMonitor = nil
-        }
-
-        if let window = popoverWindow {
-            window.contentView = nil
-            window.close()
-            popoverWindow = nil
-        }
-        popoverHostingView = nil
-    }
 }
 
 // MARK: - Translation Manager
