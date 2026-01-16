@@ -12,6 +12,7 @@ struct TranslationPopoverView: View {
     @State private var errorMessage: String?
     @State private var duration: TimeInterval?
     @State private var detectedLanguage: Language?
+    @State private var copied: Bool = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -74,9 +75,29 @@ struct TranslationPopoverView: View {
 
                     // 翻訳結果
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("翻訳結果")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                        HStack {
+                            Text("翻訳結果")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+
+                            Spacer()
+
+                            // ワンクリックコピーボタン
+                            if !isTranslating && errorMessage == nil && !translatedText.isEmpty {
+                                Button(action: {
+                                    copyToClipboard()
+                                    showCopiedFeedback()
+                                }) {
+                                    HStack(spacing: 2) {
+                                        Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                                        Text(copied ? "Copied!" : "Copy")
+                                    }
+                                    .font(.caption)
+                                    .foregroundColor(copied ? .green : .accentColor)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
 
                         if isTranslating {
                             HStack {
@@ -200,6 +221,13 @@ struct TranslationPopoverView: View {
     private func copyToClipboard() {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(translatedText, forType: .string)
+    }
+
+    private func showCopiedFeedback() {
+        copied = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            copied = false
+        }
     }
 
     private func pasteAndReplace() {
