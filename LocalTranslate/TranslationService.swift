@@ -50,6 +50,7 @@ public enum ModelType: String, CaseIterable, Identifiable {
     case alma = "alma"
     case qwen3_8b = "qwen3_8b"
     case qwen3_4b = "qwen3_4b"
+    case translateGemma = "translateGemma"
 
     public var id: String { rawValue }
 
@@ -60,6 +61,7 @@ public enum ModelType: String, CaseIterable, Identifiable {
         case .alma: return "ALMA-7B-Ja"
         case .qwen3_8b: return "Qwen3-8B"
         case .qwen3_4b: return "Qwen3-4B"
+        case .translateGemma: return "TranslateGemma-4B"
         }
     }
 
@@ -70,6 +72,7 @@ public enum ModelType: String, CaseIterable, Identifiable {
         case .alma: return "翻訳特化モデル（商用可）"
         case .qwen3_8b: return "Qwen製 多言語汎用モデル（商用可）"
         case .qwen3_4b: return "Qwen製 軽量多言語モデル（商用可）"
+        case .translateGemma: return "Google製 翻訳特化モデル（55言語対応）"
         }
     }
 
@@ -80,6 +83,7 @@ public enum ModelType: String, CaseIterable, Identifiable {
         case .alma: return "✅ MIT License - 商用利用可"
         case .qwen3_8b: return "✅ Apache 2.0 License - 商用利用可"
         case .qwen3_4b: return "✅ Apache 2.0 License - 商用利用可"
+        case .translateGemma: return "✅ Gemma License - 商用利用可"
         }
     }
 }

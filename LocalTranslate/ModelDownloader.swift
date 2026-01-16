@@ -77,6 +77,15 @@ class ModelDownloader: NSObject, ObservableObject {
             modelType: .qwen3_4b,
             licenseNote: "✅ 商用利用可（Apache 2.0）"
         ),
+        // TranslateGemma モデル（Google製 翻訳特化・55言語対応）
+        ModelInfo(
+            name: "TranslateGemma-4B Q4_K_M（NEW!）",
+            fileName: "translategemma-4b-it-Q4_K_M.gguf",
+            url: URL(string: "https://huggingface.co/bullerwins/translategemma-4b-it-GGUF/resolve/main/translategemma-4b-it-Q4_K_M.gguf")!,
+            sizeDescription: "約 2.5 GB",
+            modelType: .translateGemma,
+            licenseNote: "✅ 商用利用可（Gemma License）"
+        ),
     ]
 
     /// モデル保存ディレクトリ
