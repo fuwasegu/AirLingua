@@ -56,6 +56,8 @@ extension ModelAdapter where Self == PLaMoAdapter {
             return AlmaAdapter()
         case .qwen3_8b, .qwen3_4b:
             return Qwen3Adapter()
+        case .translateGemma:
+            return TranslateGemmaAdapter()
         }
     }
 }
@@ -71,5 +73,7 @@ func createModelAdapter(for modelType: ModelType) -> ModelAdapter {
         return AlmaAdapter()
     case .qwen3_8b, .qwen3_4b:
         return Qwen3Adapter()
+    case .translateGemma:
+        return TranslateGemmaAdapter()
     }
 }
