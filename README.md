@@ -11,7 +11,7 @@
 - **完全ローカル処理** - インターネット接続不要、プライバシー安全
 - **右クリックで翻訳** - テキスト選択 → 右クリック → 「AirLingua: 日本語に翻訳」
 - **メニューバー常駐** - 軽量でいつでもアクセス可能
-- **複数モデル対応** - PLaMo-2-translate / ELYZA-JP-8B
+- **複数モデル対応** - Qwen3 / TranslateGemma / ALMA / PLaMo / ELYZA
 
 ## インストール
 
@@ -39,10 +39,14 @@ brew install --cask airlingua
 
 ## 対応モデル
 
-| モデル | サイズ | ライセンス |
-|--------|--------|------------|
-| PLaMo-2-translate | ~4.6-5.5 GB | 個人利用のみ |
-| ELYZA-JP-8B | ~4.9 GB | 商用利用可 (Llama 3) |
+| モデル | サイズ | ライセンス | 備考 |
+|--------|--------|------------|------|
+| **Qwen3-8B** | ~5.0 GB | Apache 2.0 | **推奨** - 多言語対応、高品質 |
+| TranslateGemma-4B | ~2.5 GB | Gemma License | Google製 翻訳特化、55言語対応 |
+| Qwen3-4B | ~2.5 GB | Apache 2.0 | 軽量版 |
+| ALMA-7B-Ja | ~4.1 GB | MIT | 翻訳特化 |
+| ELYZA-JP-8B | ~4.9 GB | Llama 3 | 汎用日本語モデル |
+| PLaMo-2-translate | ~4.6-5.5 GB | PLaMo Community | 個人利用のみ |
 
 ## ライセンス
 
