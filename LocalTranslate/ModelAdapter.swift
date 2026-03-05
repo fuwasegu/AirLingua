@@ -44,7 +44,7 @@ extension ModelAdapter {
         var result = chunk
         // ANSI エスケープシーケンス除去（PTY 経由でカラーコードが混入するため）
         result = result.replacingOccurrences(
-            of: "\\u{1B}\\[[0-9;]*[a-zA-Z]",
+            of: "\u{1B}\\[[0-9;]*[a-zA-Z]",
             with: "",
             options: .regularExpression
         )
@@ -60,7 +60,7 @@ extension ModelAdapter {
     func commonCleanOutput(_ output: String) -> String {
         var result = output
         result = result.replacingOccurrences(
-            of: "\\u{1B}\\[[0-9;]*[a-zA-Z]",
+            of: "\u{1B}\\[[0-9;]*[a-zA-Z]",
             with: "",
             options: .regularExpression
         )
