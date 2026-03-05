@@ -6,6 +6,7 @@
 import AppKit
 import SwiftUI
 import Combine
+import Carbon
 
 /// アプリケーションデリゲート
 /// - メニューバー常駐
@@ -20,8 +21,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// メニューバーアイテム
     private var statusItem: NSStatusItem?
 
-    /// グローバルホットキー用モニター
-    private var globalKeyMonitor: Any?
+    /// グローバルホットキー（Carbon）
+    private var japaneseHotKeyRef: EventHotKeyRef?
+    private var englishHotKeyRef: EventHotKeyRef?
+    private var carbonEventHandler: EventHandlerRef?
 
     /// メモリ表示用メニューアイテム
     private var memoryMenuItem: NSMenuItem?
@@ -61,8 +64,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
-        print("DEBUG: applicationWillTerminate called")
         translationManager.unloadModel()
+        if let ref = japaneseHotKeyRef { UnregisterEventHotKey(ref) }
+        if let ref = englishHotKeyRef { UnregisterEventHotKey(ref) }
+        if let ref = carbonEventHandler { RemoveEventHandler(ref) }
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
@@ -121,7 +126,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(enShortcut)
 
         if !AXIsProcessTrusted() {
-            let permItem = NSMenuItem(title: "⚠️ アクセシビリティ権限を許可してください", action: #selector(openAccessibilitySettings), keyEquivalent: "")
+            let permItem = NSMenuItem(title: "⚠️ ショートカットにはアクセシビリティ権限が必要", action: #selector(openAccessibilitySettings), keyEquivalent: "")
             menu.addItem(permItem)
         }
 
@@ -182,32 +187,85 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.terminate(nil)
     }
 
-    // MARK: - Global Hotkey
+    // MARK: - Global Hotkey (Carbon RegisterEventHotKey)
 
-    /// グローバルホットキーを登録（アクセシビリティ権限が必要）
+    /// グローバルホットキーを登録（Carbon API — アクセシビリティ権限不要）
     private func setupGlobalHotkey() {
-        // 権限チェックはプロンプトなしで行う（権限がなくても登録しておく）
-        if !AXIsProcessTrusted() {
-            print("ショートカットキーを使用するにはアクセシビリティ権限が必要です")
-        }
+        var eventType = EventTypeSpec(
+            eventClass: OSType(kEventClassKeyboard),
+            eventKind: UInt32(kEventHotKeyPressed)
+        )
 
-        globalKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            // CapsLock 等を無視して主要修飾キーだけ比較
-            let flags = event.modifierFlags.intersection([.command, .control, .option, .shift])
+        let selfPtr = Unmanaged.passUnretained(self).toOpaque()
 
-            // ⌃⌥J → 日本語に翻訳
-            if flags == [.control, .option] && event.keyCode == 0x26 {
-                self?.translateSelectedText(to: .japanese)
-            }
-            // ⌃⌥E → 英語に翻訳
-            if flags == [.control, .option] && event.keyCode == 0x0E {
-                self?.translateSelectedText(to: .english)
-            }
-        }
+        InstallEventHandler(
+            GetApplicationEventTarget(),
+            { (_, event, userData) -> OSStatus in
+                guard let event = event, let userData = userData else {
+                    return OSStatus(eventNotHandledErr)
+                }
+
+                var hotKeyID = EventHotKeyID()
+                GetEventParameter(
+                    event,
+                    EventParamName(kEventParamDirectObject),
+                    EventParamType(typeEventHotKeyID),
+                    nil,
+                    MemoryLayout<EventHotKeyID>.size,
+                    nil,
+                    &hotKeyID
+                )
+
+                let delegate = Unmanaged<AppDelegate>.fromOpaque(userData).takeUnretainedValue()
+
+                switch hotKeyID.id {
+                case 1: delegate.translateSelectedText(to: .japanese)
+                case 2: delegate.translateSelectedText(to: .english)
+                default: break
+                }
+
+                return noErr
+            },
+            1,
+            &eventType,
+            selfPtr,
+            &carbonEventHandler
+        )
+
+        // ⌃⌥J → 日本語に翻訳
+        var jpID = EventHotKeyID(signature: OSType(0x414C4E47), id: 1)
+        RegisterEventHotKey(
+            UInt32(kVK_ANSI_J),
+            UInt32(controlKey | optionKey),
+            jpID,
+            GetApplicationEventTarget(),
+            0,
+            &japaneseHotKeyRef
+        )
+
+        // ⌃⌥E → 英語に翻訳
+        var enID = EventHotKeyID(signature: OSType(0x414C4E47), id: 2)
+        RegisterEventHotKey(
+            UInt32(kVK_ANSI_E),
+            UInt32(controlKey | optionKey),
+            enID,
+            GetApplicationEventTarget(),
+            0,
+            &englishHotKeyRef
+        )
     }
 
     /// 選択テキストをコピーして翻訳
     nonisolated private func translateSelectedText(to language: Language) {
+        // ⌘C シミュレートにはアクセシビリティ権限が必要
+        // 権限がなければプロンプトを出して中断
+        if !AXIsProcessTrusted() {
+            AXIsProcessTrustedWithOptions(
+                [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+            )
+            return
+        }
+
         // クリップボードの変更カウントを記録（選択テキストの有無を判定するため）
         let savedChangeCount = NSPasteboard.general.changeCount
 
