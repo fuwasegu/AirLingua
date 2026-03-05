@@ -112,11 +112,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem.separator())
 
         // ショートカット案内
-        let jpShortcut = NSMenuItem(title: "⌥⌘J  日本語に翻訳", action: nil, keyEquivalent: "")
+        let jpShortcut = NSMenuItem(title: "⌃⌥J  日本語に翻訳", action: nil, keyEquivalent: "")
         jpShortcut.isEnabled = false
         menu.addItem(jpShortcut)
 
-        let enShortcut = NSMenuItem(title: "⌥⌘E  英語に翻訳", action: nil, keyEquivalent: "")
+        let enShortcut = NSMenuItem(title: "⌃⌥E  英語に翻訳", action: nil, keyEquivalent: "")
         enShortcut.isEnabled = false
         menu.addItem(enShortcut)
 
@@ -190,12 +190,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         globalKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
             let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
 
-            // ⌥⌘J → 日本語に翻訳
-            if flags == [.command, .option] && event.keyCode == 0x26 {
+            // ⌃⌥J → 日本語に翻訳
+            if flags == [.control, .option] && event.keyCode == 0x26 {
                 self?.translateSelectedText(to: .japanese)
             }
-            // ⌥⌘E → 英語に翻訳
-            if flags == [.command, .option] && event.keyCode == 0x0E {
+            // ⌃⌥E → 英語に翻訳
+            if flags == [.control, .option] && event.keyCode == 0x0E {
                 self?.translateSelectedText(to: .english)
             }
         }
