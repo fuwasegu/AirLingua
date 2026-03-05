@@ -125,9 +125,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         enShortcut.isEnabled = false
         menu.addItem(enShortcut)
 
-        if !AXIsProcessTrusted() {
-            let permItem = NSMenuItem(title: "⚠️ ショートカットにはアクセシビリティ権限が必要", action: #selector(openAccessibilitySettings), keyEquivalent: "")
-            menu.addItem(permItem)
+        if AXIsProcessTrusted() {
+            let hintItem = NSMenuItem(title: "テキスト選択 → ショートカットで翻訳", action: nil, keyEquivalent: "")
+            hintItem.isEnabled = false
+            menu.addItem(hintItem)
+        } else {
+            let hintItem = NSMenuItem(title: "⌘C → ショートカットで翻訳", action: nil, keyEquivalent: "")
+            hintItem.isEnabled = false
+            menu.addItem(hintItem)
         }
 
         menu.addItem(NSMenuItem.separator())
@@ -177,10 +182,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         self.settingsWindow = window
 
         NSApp.activate(ignoringOtherApps: true)
-    }
-
-    @objc private func openAccessibilitySettings() {
-        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
     }
 
     @objc private func quitApp() {
@@ -256,32 +257,39 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// 選択テキストをコピーして翻訳
+    /// - アクセシビリティ権限あり: 自動で ⌘C → 翻訳（1ステップ）
+    /// - 権限未許可（初回）: プロンプトを表示して中断
+    /// - 権限拒否済み: クリップボードの既存テキストを翻訳（⌘C → ショートカットの2ステップ）
     nonisolated private func translateSelectedText(to language: Language) {
-        // ⌘C シミュレートにはアクセシビリティ権限が必要
-        // 権限がなければプロンプトを出して中断
-        if !AXIsProcessTrusted() {
+        if AXIsProcessTrusted() {
+            // 権限あり: ⌘C シミュレートで選択テキストを自動取得
+            let savedChangeCount = NSPasteboard.general.changeCount
+
+            let source = CGEventSource(stateID: .combinedSessionState)
+            let cKeyDown = CGEvent(keyboardEventSource: source, virtualKey: 0x08, keyDown: true)
+            cKeyDown?.flags = .maskCommand
+            cKeyDown?.post(tap: .cghidEventTap)
+            let cKeyUp = CGEvent(keyboardEventSource: source, virtualKey: 0x08, keyDown: false)
+            cKeyUp?.flags = .maskCommand
+            cKeyUp?.post(tap: .cghidEventTap)
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                // コピーできたら翻訳、できなければ（未選択）何もしない
+                guard NSPasteboard.general.changeCount != savedChangeCount else { return }
+                guard let text = NSPasteboard.general.string(forType: .string), !text.isEmpty else { return }
+
+                Task { @MainActor [weak self] in
+                    await self?.quickTranslate(text: text, to: language)
+                }
+            }
+        } else if !UserDefaults.standard.bool(forKey: "accessibilityPrompted") {
+            // 初回: プロンプトを表示（配布先ユーザーは一度許可すればOK）
+            UserDefaults.standard.set(true, forKey: "accessibilityPrompted")
             AXIsProcessTrustedWithOptions(
                 [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
             )
-            return
-        }
-
-        // クリップボードの変更カウントを記録（選択テキストの有無を判定するため）
-        let savedChangeCount = NSPasteboard.general.changeCount
-
-        // ⌘C をシミュレート（選択テキストをクリップボードにコピー）
-        let source = CGEventSource(stateID: .combinedSessionState)
-        let cKeyDown = CGEvent(keyboardEventSource: source, virtualKey: 0x08, keyDown: true)
-        cKeyDown?.flags = .maskCommand
-        cKeyDown?.post(tap: .cghidEventTap)
-        let cKeyUp = CGEvent(keyboardEventSource: source, virtualKey: 0x08, keyDown: false)
-        cKeyUp?.flags = .maskCommand
-        cKeyUp?.post(tap: .cghidEventTap)
-
-        // クリップボード更新を待ってから翻訳実行
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            // クリップボードが更新されていなければ何もしない（テキスト未選択）
-            guard NSPasteboard.general.changeCount != savedChangeCount else { return }
+        } else {
+            // 権限なし（プロンプト済み）: クリップボードの既存テキストを翻訳
             guard let text = NSPasteboard.general.string(forType: .string), !text.isEmpty else { return }
 
             Task { @MainActor [weak self] in
