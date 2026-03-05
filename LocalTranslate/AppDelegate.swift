@@ -120,6 +120,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         enShortcut.isEnabled = false
         menu.addItem(enShortcut)
 
+        if !AXIsProcessTrusted() {
+            let permItem = NSMenuItem(title: "⚠️ アクセシビリティ権限を許可してください", action: #selector(openAccessibilitySettings), keyEquivalent: "")
+            menu.addItem(permItem)
+        }
+
         menu.addItem(NSMenuItem.separator())
 
         // 設定
@@ -169,6 +174,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
     }
 
+    @objc private func openAccessibilitySettings() {
+        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
+    }
+
     @objc private func quitApp() {
         NSApp.terminate(nil)
     }
@@ -177,18 +186,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// グローバルホットキーを登録（アクセシビリティ権限が必要）
     private func setupGlobalHotkey() {
-        // アクセシビリティ権限の確認（未許可なら許可ダイアログを表示）
-        let trusted = AXIsProcessTrustedWithOptions(
-            [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
-        )
-
-        if !trusted {
-            print("アクセシビリティ権限を許可してください（システム設定 → プライバシーとセキュリティ → アクセシビリティ）")
+        // 権限チェックはプロンプトなしで行う（権限がなくても登録しておく）
+        if !AXIsProcessTrusted() {
+            print("ショートカットキーを使用するにはアクセシビリティ権限が必要です")
         }
 
-        // 権限がなくても登録しておく（後から許可された時に機能する）
         globalKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            // CapsLock 等を無視して主要修飾キーだけ比較
+            let flags = event.modifierFlags.intersection([.command, .control, .option, .shift])
 
             // ⌃⌥J → 日本語に翻訳
             if flags == [.control, .option] && event.keyCode == 0x26 {
