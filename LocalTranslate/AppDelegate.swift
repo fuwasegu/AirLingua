@@ -20,6 +20,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// メニューバーアイテム
     private var statusItem: NSStatusItem?
 
+    /// グローバルホットキー用モニター
+    private var globalKeyMonitor: Any?
+
     /// メモリ表示用メニューアイテム
     private var memoryMenuItem: NSMenuItem?
 
@@ -40,6 +43,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         translationManager.onModelLoaded = { [weak self] in
             self?.updateStatusBarMenu()
         }
+
+        // グローバルホットキーを登録
+        setupGlobalHotkey()
 
         // モデルを自動ロード
         Task {
@@ -105,6 +111,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         menu.addItem(NSMenuItem.separator())
 
+        // ショートカット案内
+        let jpShortcut = NSMenuItem(title: "⌥⌘J  日本語に翻訳", action: nil, keyEquivalent: "")
+        jpShortcut.isEnabled = false
+        menu.addItem(jpShortcut)
+
+        let enShortcut = NSMenuItem(title: "⌥⌘E  英語に翻訳", action: nil, keyEquivalent: "")
+        enShortcut.isEnabled = false
+        menu.addItem(enShortcut)
+
+        menu.addItem(NSMenuItem.separator())
+
         // 設定
         let settingsItem = NSMenuItem(title: "設定...", action: #selector(openSettings), keyEquivalent: ",")
         menu.addItem(settingsItem)
@@ -154,6 +171,60 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func quitApp() {
         NSApp.terminate(nil)
+    }
+
+    // MARK: - Global Hotkey
+
+    /// グローバルホットキーを登録（アクセシビリティ権限が必要）
+    private func setupGlobalHotkey() {
+        // アクセシビリティ権限の確認（未許可なら許可ダイアログを表示）
+        let trusted = AXIsProcessTrustedWithOptions(
+            [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+        )
+
+        if !trusted {
+            print("アクセシビリティ権限を許可してください（システム設定 → プライバシーとセキュリティ → アクセシビリティ）")
+        }
+
+        // 権限がなくても登録しておく（後から許可された時に機能する）
+        globalKeyMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+
+            // ⌥⌘J → 日本語に翻訳
+            if flags == [.command, .option] && event.keyCode == 0x26 {
+                self?.translateSelectedText(to: .japanese)
+            }
+            // ⌥⌘E → 英語に翻訳
+            if flags == [.command, .option] && event.keyCode == 0x0E {
+                self?.translateSelectedText(to: .english)
+            }
+        }
+    }
+
+    /// 選択テキストをコピーして翻訳
+    nonisolated private func translateSelectedText(to language: Language) {
+        // クリップボードの変更カウントを記録（選択テキストの有無を判定するため）
+        let savedChangeCount = NSPasteboard.general.changeCount
+
+        // ⌘C をシミュレート（選択テキストをクリップボードにコピー）
+        let source = CGEventSource(stateID: .combinedSessionState)
+        let cKeyDown = CGEvent(keyboardEventSource: source, virtualKey: 0x08, keyDown: true)
+        cKeyDown?.flags = .maskCommand
+        cKeyDown?.post(tap: .cghidEventTap)
+        let cKeyUp = CGEvent(keyboardEventSource: source, virtualKey: 0x08, keyDown: false)
+        cKeyUp?.flags = .maskCommand
+        cKeyUp?.post(tap: .cghidEventTap)
+
+        // クリップボード更新を待ってから翻訳実行
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            // クリップボードが更新されていなければ何もしない（テキスト未選択）
+            guard NSPasteboard.general.changeCount != savedChangeCount else { return }
+            guard let text = NSPasteboard.general.string(forType: .string), !text.isEmpty else { return }
+
+            Task { @MainActor [weak self] in
+                await self?.quickTranslate(text: text, to: language)
+            }
+        }
     }
 
     // MARK: - Services
