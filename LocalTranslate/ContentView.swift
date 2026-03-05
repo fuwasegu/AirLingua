@@ -8,262 +8,15 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// メインコンテンツビュー
-struct ContentView: View {
-    @EnvironmentObject var translationManager: TranslationManager
-    @StateObject private var memoryMonitor = MemoryMonitor()
-    @State private var inputText: String = ""
-    @State private var outputText: String = ""
-    @State private var isTranslating: Bool = false
-    @State private var selectedTargetLanguage: Language = .japanese
-    @State private var selectedSourceLanguage: Language? = nil  // nil = 自動検出
-    @State private var showingError: Bool = false
-    @State private var errorMessage: String = ""
-
-    var body: some View {
-        VStack(spacing: 16) {
-            // ヘッダー
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("AirLingua")
-                        .font(.title2)
-                        .fontWeight(.semibold)
-                    Text(translationManager.modelType.displayName)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                Spacer()
-                VStack(alignment: .trailing, spacing: 2) {
-                    StatusIndicator(isReady: translationManager.isReady, isLoading: translationManager.isLoading)
-                    Text(memoryMonitor.formattedUsage)
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                        .monospacedDigit()
-                }
-            }
-            .padding(.horizontal)
-
-            // 言語選択
-            HStack(spacing: 8) {
-                LanguagePicker(
-                    label: "From",
-                    selection: Binding(
-                        get: { selectedSourceLanguage ?? .english },
-                        set: { selectedSourceLanguage = $0 }
-                    ),
-                    includeAuto: true,
-                    isAuto: selectedSourceLanguage == nil,
-                    onAutoToggle: { selectedSourceLanguage = nil }
-                )
-
-                Image(systemName: "arrow.right")
-                    .foregroundColor(.secondary)
-
-                LanguagePicker(
-                    label: "To",
-                    selection: $selectedTargetLanguage,
-                    includeAuto: false,
-                    isAuto: false,
-                    onAutoToggle: {}
-                )
-            }
-            .padding(.horizontal)
-
-            // 入力エリア
-            VStack(alignment: .leading, spacing: 4) {
-                Text("原文")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                TextEditor(text: $inputText)
-                    .font(.body)
-                    .frame(minHeight: 100)
-                    .padding(8)
-                    .background(Color(NSColor.textBackgroundColor))
-                    .cornerRadius(8)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.gray.opacity(0.3), lineWidth: 1)
-                    )
-            }
-            .padding(.horizontal)
-
-            // 翻訳ボタン
-            Button(action: translate) {
-                HStack {
-                    if isTranslating {
-                        ProgressView()
-                            .scaleEffect(0.8)
-                            .progressViewStyle(.circular)
-                    }
-                    Text(isTranslating ? "翻訳中..." : "翻訳")
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(inputText.isEmpty || isTranslating || !translationManager.isReady)
-            .padding(.horizontal)
-
-            // 出力エリア
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text("翻訳結果")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                    Spacer()
-                    if !outputText.isEmpty {
-                        Button(action: copyToClipboard) {
-                            Image(systemName: "doc.on.doc")
-                        }
-                        .buttonStyle(.borderless)
-                        .help("クリップボードにコピー")
-                    }
-                }
-                TextEditor(text: .constant(outputText))
-                    .font(.body)
-                    .frame(minHeight: 100)
-                    .padding(8)
-                    .background(Color(NSColor.textBackgroundColor))
-                    .cornerRadius(8)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.gray.opacity(0.3), lineWidth: 1)
-                    )
-            }
-            .padding(.horizontal)
-
-            // フッター（ライセンス表記）
-            HStack {
-                Spacer()
-                Text(translationManager.modelType.licenseNote)
-                    .font(.caption2)
-                    .foregroundColor(translationManager.modelType == .plamo ? .orange : .secondary)
-            }
-            .padding(.horizontal)
-            .padding(.bottom, 8)
-        }
-        .frame(minWidth: 400, minHeight: 450)
-        .padding(.vertical)
-        .alert("エラー", isPresented: $showingError) {
-            Button("OK") { }
-        } message: {
-            Text(errorMessage)
-        }
-        .task {
-            // アプリ起動時にモデルを読み込む
-            if !translationManager.isReady && !translationManager.isLoading {
-                await translationManager.loadModel()
-            }
-        }
-    }
-
-    private func translate() {
-        guard !inputText.isEmpty else { return }
-
-        isTranslating = true
-        Task { @MainActor in
-            do {
-                let result = try await translationManager.translate(
-                    inputText,
-                    from: selectedSourceLanguage,
-                    to: selectedTargetLanguage
-                )
-                outputText = result.translatedText
-                isTranslating = false
-            } catch {
-                errorMessage = error.localizedDescription
-                showingError = true
-                isTranslating = false
-            }
-        }
-    }
-
-    private func copyToClipboard() {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(outputText, forType: .string)
-    }
-}
-
-/// ステータスインジケーター
-struct StatusIndicator: View {
-    let isReady: Bool
-    let isLoading: Bool
-
-    var body: some View {
-        HStack(spacing: 4) {
-            Circle()
-                .fill(statusColor)
-                .frame(width: 8, height: 8)
-            Text(statusText)
-                .font(.caption)
-                .foregroundColor(.secondary)
-        }
-    }
-
-    private var statusColor: Color {
-        if isLoading {
-            return .orange
-        }
-        return isReady ? .green : .red
-    }
-
-    private var statusText: String {
-        if isLoading {
-            return "読み込み中"
-        }
-        return isReady ? "準備完了" : "未読み込み"
-    }
-}
-
-/// 言語選択ピッカー
-struct LanguagePicker: View {
-    let label: String
-    @Binding var selection: Language
-    let includeAuto: Bool
-    let isAuto: Bool
-    let onAutoToggle: () -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(label)
-                .font(.caption2)
-                .foregroundColor(.secondary)
-
-            if includeAuto {
-                Menu {
-                    Button("自動検出") {
-                        onAutoToggle()
-                    }
-                    Divider()
-                    ForEach(Language.allCases) { language in
-                        Button(language.localizedName) {
-                            selection = language
-                        }
-                    }
-                } label: {
-                    Text(isAuto ? "自動検出" : selection.localizedName)
-                        .frame(minWidth: 100)
-                }
-            } else {
-                Picker("", selection: $selection) {
-                    ForEach(Language.allCases) { language in
-                        Text(language.localizedName).tag(language)
-                    }
-                }
-                .labelsHidden()
-                .frame(minWidth: 100)
-            }
-        }
-    }
-}
-
 /// 設定ビュー
 struct SettingsView: View {
     @EnvironmentObject var translationManager: TranslationManager
     @EnvironmentObject var downloader: ModelDownloader
     @AppStorage("modelPath") private var modelPath: String = ""
     @AppStorage("modelType") private var modelTypeRaw: String = ModelType.plamo.rawValue
-    @State private var selectedDownloadIndex: Int = 0
+    @State private var selectedDownloadIndex: Int = ModelDownloader.availableModels.firstIndex(where: { !$0.modelType.isLegacy }) ?? 0
+    @State private var showLegacyInSelect: Bool = false
+    @State private var showLegacyInDownload: Bool = false
     @State private var refreshTrigger: Bool = false  // 再描画用トリガー
 
     private var modelType: ModelType {
@@ -293,28 +46,28 @@ struct SettingsView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 20)
                 } else {
-                    VStack(alignment: .leading, spacing: 6) {
-                        ForEach(downloadedModels, id: \.fileName) { model in
-                            let isSelected = modelPath == downloader.modelsDirectory.appendingPathComponent(model.fileName).path
+                    let currentModels = downloadedModels.filter { !$0.modelType.isLegacy }
+                    let legacyModels = downloadedModels.filter { $0.modelType.isLegacy }
 
-                            HStack {
-                                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                                    .foregroundColor(isSelected ? .accentColor : .secondary)
+                    if !currentModels.isEmpty {
+                        VStack(alignment: .leading, spacing: 6) {
+                            ForEach(currentModels, id: \.fileName) { model in
+                                modelSelectRow(model)
+                            }
+                        }
+                    }
 
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(model.name)
-                                    Text(model.licenseNote)
-                                        .font(.caption)
-                                        .foregroundColor(model.modelType == .plamo ? .orange : .green)
+                    if !legacyModels.isEmpty {
+                        DisclosureGroup(isExpanded: $showLegacyInSelect) {
+                            VStack(alignment: .leading, spacing: 6) {
+                                ForEach(legacyModels, id: \.fileName) { model in
+                                    modelSelectRow(model)
                                 }
-
-                                Spacer()
                             }
-                            .padding(.vertical, 4)
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                selectModel(model)
-                            }
+                        } label: {
+                            Text("旧モデルを表示")
+                                .contentShape(Rectangle())
+                                .onTapGesture { showLegacyInSelect.toggle() }
                         }
                     }
 
@@ -329,6 +82,13 @@ struct SettingsView: View {
                         }
                         .padding(.top, 4)
                     }
+
+                    if modelType == .qwen35_0_8b {
+                        Text("選択中のモデルはパラメータ数が少ないため高速ですが、翻訳品質や出力が不安定です")
+                            .font(.caption)
+                            .foregroundColor(.red)
+                            .padding(.top, 4)
+                    }
                 }
             }
 
@@ -336,39 +96,25 @@ struct SettingsView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     ForEach(0..<ModelDownloader.availableModels.count, id: \.self) { index in
                         let model = ModelDownloader.availableModels[index]
-                        let isDownloaded = downloader.isModelDownloaded(model)
-
-                        HStack {
-                            Image(systemName: !isDownloaded && selectedDownloadIndex == index ? "circle.fill" : "circle")
-                                .foregroundColor(!isDownloaded && selectedDownloadIndex == index ? .accentColor : .secondary)
-                                .font(.caption)
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                HStack {
-                                    Text(model.name)
-                                        .foregroundColor(isDownloaded ? .secondary : .primary)
-                                    if isDownloaded {
-                                        Image(systemName: "checkmark.circle.fill")
-                                            .foregroundColor(.green)
-                                            .font(.caption)
-                                    }
-                                }
-                                Text("\(model.sizeDescription) \(model.licenseNote)")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-
-                            Spacer()
+                        if !model.modelType.isLegacy {
+                            modelDownloadRow(index: index, model: model)
                         }
-                        .padding(.vertical, 2)
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            if !isDownloaded {
-                                selectedDownloadIndex = index
-                            }
-                        }
-                        .opacity(isDownloaded ? 0.5 : 1.0)
                     }
+                }
+
+                DisclosureGroup(isExpanded: $showLegacyInDownload) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(0..<ModelDownloader.availableModels.count, id: \.self) { index in
+                            let model = ModelDownloader.availableModels[index]
+                            if model.modelType.isLegacy {
+                                modelDownloadRow(index: index, model: model)
+                            }
+                        }
+                    }
+                } label: {
+                    Text("旧モデルを表示")
+                        .contentShape(Rectangle())
+                        .onTapGesture { showLegacyInDownload.toggle() }
                 }
 
                 if downloader.isDownloading {
@@ -488,6 +234,66 @@ struct SettingsView: View {
         }
     }
 
+    @ViewBuilder
+    private func modelSelectRow(_ model: ModelDownloader.ModelInfo) -> some View {
+        let isSelected = modelPath == downloader.modelsDirectory.appendingPathComponent(model.fileName).path
+
+        HStack {
+            Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                .foregroundColor(isSelected ? .accentColor : .secondary)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(model.name)
+                Text(model.licenseNote)
+                    .font(.caption)
+                    .foregroundColor(model.modelType == .plamo ? .orange : .green)
+            }
+
+            Spacer()
+        }
+        .padding(.vertical, 4)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            selectModel(model)
+        }
+    }
+
+    @ViewBuilder
+    private func modelDownloadRow(index: Int, model: ModelDownloader.ModelInfo) -> some View {
+        let isDownloaded = downloader.isModelDownloaded(model)
+
+        HStack {
+            Image(systemName: !isDownloaded && selectedDownloadIndex == index ? "circle.fill" : "circle")
+                .foregroundColor(!isDownloaded && selectedDownloadIndex == index ? .accentColor : .secondary)
+                .font(.caption)
+
+            VStack(alignment: .leading, spacing: 2) {
+                HStack {
+                    Text(model.name)
+                        .foregroundColor(isDownloaded ? .secondary : .primary)
+                    if isDownloaded {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.green)
+                            .font(.caption)
+                    }
+                }
+                Text("\(model.sizeDescription) \(model.licenseNote)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            Spacer()
+        }
+        .padding(.vertical, 2)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if !isDownloaded {
+                selectedDownloadIndex = index
+            }
+        }
+        .opacity(isDownloaded ? 0.5 : 1.0)
+    }
+
     /// モデルを選択して使用
     private func selectModel(_ model: ModelDownloader.ModelInfo) {
         let path = downloader.modelsDirectory.appendingPathComponent(model.fileName).path
@@ -501,7 +307,3 @@ struct SettingsView: View {
     }
 }
 
-#Preview {
-    ContentView()
-        .environmentObject(TranslationManager())
-}

@@ -26,6 +26,16 @@ public protocol TranslationService: AnyObject {
         from sourceLanguage: Language?,
         to targetLanguage: Language
     ) async throws -> TranslationResult
+
+    /// テキストをストリーミング翻訳する（トークン単位で逐次返す）
+    func translateStream(
+        _ text: String,
+        from sourceLanguage: Language?,
+        to targetLanguage: Language
+    ) -> AsyncThrowingStream<String, Error>
+
+    /// ストリーム完了後の最終クリーニング
+    func cleanOutput(_ text: String) -> String
 }
 
 /// サポートする言語（英日翻訳専用）
@@ -50,6 +60,10 @@ public enum ModelType: String, CaseIterable, Identifiable {
     case alma = "alma"
     case qwen3_8b = "qwen3_8b"
     case qwen3_4b = "qwen3_4b"
+    case qwen35_0_8b = "qwen35_0_8b"
+    case qwen35_2b = "qwen35_2b"
+    case qwen35_4b = "qwen35_4b"
+    case qwen35_9b = "qwen35_9b"
     case translateGemma = "translateGemma"
 
     public var id: String { rawValue }
@@ -61,6 +75,10 @@ public enum ModelType: String, CaseIterable, Identifiable {
         case .alma: return "ALMA-7B-Ja"
         case .qwen3_8b: return "Qwen3-8B"
         case .qwen3_4b: return "Qwen3-4B"
+        case .qwen35_0_8b: return "Qwen3.5-0.8B"
+        case .qwen35_2b: return "Qwen3.5-2B"
+        case .qwen35_4b: return "Qwen3.5-4B"
+        case .qwen35_9b: return "Qwen3.5-9B"
         case .translateGemma: return "TranslateGemma-4B"
         }
     }
@@ -72,6 +90,10 @@ public enum ModelType: String, CaseIterable, Identifiable {
         case .alma: return "翻訳特化モデル（商用可）"
         case .qwen3_8b: return "Qwen製 多言語汎用モデル（商用可）"
         case .qwen3_4b: return "Qwen製 軽量多言語モデル（商用可）"
+        case .qwen35_0_8b: return "Qwen3.5 超軽量モデル（商用可）"
+        case .qwen35_2b: return "Qwen3.5 軽量モデル（商用可）"
+        case .qwen35_4b: return "Qwen3.5 バランスモデル（商用可）"
+        case .qwen35_9b: return "Qwen3.5 高品質モデル（商用可）"
         case .translateGemma: return "Google製 翻訳特化モデル（55言語対応）"
         }
     }
@@ -83,7 +105,20 @@ public enum ModelType: String, CaseIterable, Identifiable {
         case .alma: return "✅ MIT License - 商用利用可"
         case .qwen3_8b: return "✅ Apache 2.0 License - 商用利用可"
         case .qwen3_4b: return "✅ Apache 2.0 License - 商用利用可"
+        case .qwen35_0_8b: return "✅ Apache 2.0 License - 商用利用可"
+        case .qwen35_2b: return "✅ Apache 2.0 License - 商用利用可"
+        case .qwen35_4b: return "✅ Apache 2.0 License - 商用利用可"
+        case .qwen35_9b: return "✅ Apache 2.0 License - 商用利用可"
         case .translateGemma: return "✅ Gemma License - 商用利用可"
+        }
+    }
+
+    public var isLegacy: Bool {
+        switch self {
+        case .elyza, .alma, .qwen3_8b, .qwen3_4b:
+            return true
+        case .plamo, .qwen35_0_8b, .qwen35_2b, .qwen35_4b, .qwen35_9b, .translateGemma:
+            return false
         }
     }
 }

@@ -179,7 +179,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// ローディングウィンドウ（強参照で保持）
     private var loadingWindow: NSWindow?
 
-    /// クイック翻訳（結果だけ表示）
+    /// クイック翻訳（ストリーミング表示）
     private func quickTranslate(text: String, to targetLanguage: Language) async {
         // マウス位置を使用
         let displayPosition = NSEvent.mouseLocation
@@ -198,13 +198,37 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
+        let stream = translationManager.translateStream(text, from: nil, to: targetLanguage)
+
         do {
-            let result = try await translationManager.translate(text, from: nil, to: targetLanguage)
+            var fullText = ""
+            var isFirstChunk = true
 
-            hideLoading()
+            for try await chunk in stream {
+                fullText += chunk
 
-            // 結果をポップアップで表示
-            showQuickResult(result.translatedText, at: displayPosition)
+                if isFirstChunk {
+                    // 最初のチャンクが来たらローディングを消して結果ウィンドウを表示
+                    hideLoading()
+                    showQuickResult("", at: displayPosition)
+                    isFirstChunk = false
+                }
+
+                // NSTextView を直接更新（AppKit なので即反映）
+                resultTextView?.string = fullText
+                currentResultText = fullText
+            }
+
+            // ストリームが空だった場合
+            if isFirstChunk {
+                hideLoading()
+                showQuickResult("", at: displayPosition)
+            }
+
+            // 完了後に最終クリーニング
+            let cleaned = translationManager.cleanOutput(fullText)
+            resultTextView?.string = cleaned
+            currentResultText = cleaned
         } catch {
             hideLoading()
             showQuickError("翻訳エラー: \(error.localizedDescription)")
@@ -277,6 +301,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// 結果ウィンドウ
     private var resultWindow: NSPanel?
+    /// ストリーミング更新用の NSTextView 参照
+    private weak var resultTextView: NSTextView?
     /// 現在表示中の翻訳結果テキスト
     private var currentResultText: String = ""
 
@@ -375,6 +401,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         textView.autoresizingMask = [.width]
         scrollView.documentView = textView
         containerView.addSubview(scrollView)
+
+        self.resultTextView = textView
 
         // リサイズ可能なウィンドウ
         let window = NSPanel(
@@ -525,6 +553,24 @@ class TranslationManager: ObservableObject {
         }
 
         return try await translator.translate(text, from: sourceLanguage, to: targetLanguage)
+    }
+
+    /// ストリーム完了後の最終クリーニング
+    func cleanOutput(_ text: String) -> String {
+        translator?.cleanOutput(text) ?? text
+    }
+
+    /// ストリーミング翻訳を実行
+    func translateStream(
+        _ text: String,
+        from sourceLanguage: Language?,
+        to targetLanguage: Language
+    ) -> AsyncThrowingStream<String, Error> {
+        guard let translator = translator else {
+            return AsyncThrowingStream { $0.finish(throwing: TranslationError.modelNotLoaded) }
+        }
+
+        return translator.translateStream(text, from: sourceLanguage, to: targetLanguage)
     }
 }
 
