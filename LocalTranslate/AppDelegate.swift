@@ -36,6 +36,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // サービスメニューを更新
         NSUpdateDynamicServices()
 
+        // モデル切り替え時にステータスバーを更新
+        translationManager.onModelLoaded = { [weak self] in
+            self?.updateStatusBarMenu()
+        }
+
         // モデルを自動ロード
         Task {
             await translationManager.loadModel()
@@ -503,6 +508,9 @@ class TranslationManager: ObservableObject {
         return ""
     }
 
+    /// モデル切り替え通知
+    var onModelLoaded: (() -> Void)?
+
     /// モデルを読み込む
     func loadModel() async {
         guard !isLoading else { return }
@@ -528,6 +536,7 @@ class TranslationManager: ObservableObject {
             self.translator = translator
             isReady = true
             isLoading = false
+            onModelLoaded?()
         } catch {
             errorMessage = error.localizedDescription
             isReady = false
@@ -540,6 +549,7 @@ class TranslationManager: ObservableObject {
         translator?.unloadModel()
         translator = nil
         isReady = false
+        isLoading = false
     }
 
     /// 翻訳を実行
