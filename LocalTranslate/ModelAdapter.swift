@@ -39,9 +39,15 @@ extension ModelAdapter {
         return result
     }
 
-    /// デフォルトのストリームチャンク軽量クリーニング（停止トークンを除去）
+    /// デフォルトのストリームチャンク軽量クリーニング（停止トークン・ANSIエスケープを除去）
     func cleanStreamChunk(_ chunk: String) -> String {
         var result = chunk
+        // ANSI エスケープシーケンス除去（PTY 経由でカラーコードが混入するため）
+        result = result.replacingOccurrences(
+            of: "\\u{1B}\\[[0-9;]*[a-zA-Z]",
+            with: "",
+            options: .regularExpression
+        )
         for token in stopTokens {
             result = result.replacingOccurrences(of: token, with: "")
         }
@@ -53,6 +59,11 @@ extension ModelAdapter {
     /// 共通のクリーニング処理
     func commonCleanOutput(_ output: String) -> String {
         var result = output
+        result = result.replacingOccurrences(
+            of: "\\u{1B}\\[[0-9;]*[a-zA-Z]",
+            with: "",
+            options: .regularExpression
+        )
         result = result.replacingOccurrences(of: "[end of text]", with: "")
         return result.trimmingCharacters(in: .whitespacesAndNewlines)
     }

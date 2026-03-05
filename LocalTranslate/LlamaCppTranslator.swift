@@ -15,6 +15,7 @@ public final class LlamaCppTranslator: TranslationService {
         public var contextSize: Int = 4096  // 長文対応
         public var temperature: Float = 0.1
         public var maxTokens: Int = 2048    // 長い出力に対応
+        public var repeatPenalty: Float = 1.1  // 繰り返し抑制
 
         public static let `default` = Config()
     }
@@ -173,6 +174,7 @@ public final class LlamaCppTranslator: TranslationService {
         let maxTokens = self.config.maxTokens
         let contextSize = self.config.contextSize
         let temperature = self.config.temperature
+        let repeatPenalty = self.config.repeatPenalty
         let stopTokens = self.adapter.stopTokens
         let adapter = self.adapter
         let env = self.processEnvironment()
@@ -189,6 +191,7 @@ public final class LlamaCppTranslator: TranslationService {
                     "-n", String(maxTokens),
                     "-c", String(contextSize),
                     "--temp", String(temperature),
+                    "--repeat-penalty", String(repeatPenalty),
                     "--no-display-prompt",
                     "--no-conversation",
                 ]
@@ -270,6 +273,7 @@ public final class LlamaCppTranslator: TranslationService {
         let maxTokens = self.config.maxTokens
         let contextSize = self.config.contextSize
         let temperature = self.config.temperature
+        let repeatPenalty = self.config.repeatPenalty
         let stopTokens = self.adapter.stopTokens
 
         let env = self.processEnvironment()
@@ -285,6 +289,7 @@ public final class LlamaCppTranslator: TranslationService {
                 "-n", String(maxTokens),
                 "-c", String(contextSize),
                 "--temp", String(temperature),
+                "--repeat-penalty", String(repeatPenalty),
                 "--no-display-prompt",
                 "--no-conversation",
             ]
