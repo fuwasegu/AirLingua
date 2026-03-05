@@ -156,6 +156,16 @@ public final class LlamaCppTranslator: TranslationService {
 
     // MARK: - Private Methods
 
+    /// llama-completion 用の環境変数を構築（Homebrew ライブラリパスを含む）
+    private func processEnvironment() -> [String: String] {
+        var env = ProcessInfo.processInfo.environment
+        let homebrewLibPaths = ["/opt/homebrew/lib", "/usr/local/lib"]
+        let existing = env["DYLD_LIBRARY_PATH"] ?? ""
+        let allPaths = (existing.isEmpty ? [] : [existing]) + homebrewLibPaths
+        env["DYLD_LIBRARY_PATH"] = allPaths.joined(separator: ":")
+        return env
+    }
+
     /// llama-completion をストリーミング実行
     private func runLlamaCompletionStream(prompt: String) -> AsyncThrowingStream<String, Error> {
         let modelPath = self.modelPath
@@ -165,11 +175,13 @@ public final class LlamaCppTranslator: TranslationService {
         let temperature = self.config.temperature
         let stopTokens = self.adapter.stopTokens
         let adapter = self.adapter
+        let env = self.processEnvironment()
 
         return AsyncThrowingStream { continuation in
             DispatchQueue(label: "llama-stream", qos: .userInitiated).async {
                 let process = Process()
                 process.executableURL = URL(fileURLWithPath: llamaPath)
+                process.environment = env
 
                 var arguments = [
                     "-m", modelPath,
@@ -260,9 +272,12 @@ public final class LlamaCppTranslator: TranslationService {
         let temperature = self.config.temperature
         let stopTokens = self.adapter.stopTokens
 
+        let env = self.processEnvironment()
+
         return try await Task.detached(priority: .userInitiated) {
             let process = Process()
             process.executableURL = URL(fileURLWithPath: llamaPath)
+            process.environment = env
 
             var arguments = [
                 "-m", modelPath,
