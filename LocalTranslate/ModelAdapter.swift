@@ -14,6 +14,9 @@ protocol ModelAdapter {
     /// 出力をクリーニング（不要なトークンや前置きを除去）
     func cleanOutput(_ output: String) -> String
 
+    /// ストリーム中の軽量クリーニング（停止トークン等を除去）
+    func cleanStreamChunk(_ chunk: String) -> String
+
     /// 入力テキストを正規化（モデルに渡す前の前処理）
     func normalizeInput(_ text: String) -> String
 }
@@ -33,6 +36,17 @@ extension ModelAdapter {
             result = result.replacingOccurrences(of: "\n\n\n", with: "\n\n")
         }
 
+        return result
+    }
+
+    /// デフォルトのストリームチャンク軽量クリーニング（停止トークンを除去）
+    func cleanStreamChunk(_ chunk: String) -> String {
+        var result = chunk
+        for token in stopTokens {
+            result = result.replacingOccurrences(of: token, with: "")
+        }
+        result = result.replacingOccurrences(of: "<|endoftext|>", with: "")
+        result = result.replacingOccurrences(of: "[end of text]", with: "")
         return result
     }
 
@@ -56,6 +70,8 @@ extension ModelAdapter where Self == PLaMoAdapter {
             return AlmaAdapter()
         case .qwen3_8b, .qwen3_4b:
             return Qwen3Adapter()
+        case .qwen35_0_8b, .qwen35_2b, .qwen35_4b, .qwen35_9b:
+            return Qwen35Adapter()
         case .translateGemma:
             return TranslateGemmaAdapter()
         }
@@ -73,6 +89,8 @@ func createModelAdapter(for modelType: ModelType) -> ModelAdapter {
         return AlmaAdapter()
     case .qwen3_8b, .qwen3_4b:
         return Qwen3Adapter()
+    case .qwen35_0_8b, .qwen35_2b, .qwen35_4b, .qwen35_9b:
+        return Qwen35Adapter()
     case .translateGemma:
         return TranslateGemmaAdapter()
     }

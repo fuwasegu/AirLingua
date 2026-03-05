@@ -129,7 +129,127 @@ public final class LlamaCppTranslator: TranslationService {
         )
     }
 
+    public func cleanOutput(_ text: String) -> String {
+        adapter.cleanOutput(text)
+    }
+
+    public func translateStream(
+        _ text: String,
+        from sourceLanguage: Language?,
+        to targetLanguage: Language
+    ) -> AsyncThrowingStream<String, Error> {
+        let trimmedText = text.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard modelLoaded else {
+            return AsyncThrowingStream { $0.finish(throwing: TranslationError.modelNotLoaded) }
+        }
+        guard !trimmedText.isEmpty else {
+            return AsyncThrowingStream { $0.finish(throwing: TranslationError.emptyInput) }
+        }
+
+        let srcLang = sourceLanguage ?? detectLanguage(trimmedText)
+        let normalizedText = adapter.normalizeInput(trimmedText)
+        let prompt = adapter.buildPrompt(text: normalizedText, source: srcLang, target: targetLanguage)
+
+        return runLlamaCompletionStream(prompt: prompt)
+    }
+
     // MARK: - Private Methods
+
+    /// llama-completion をストリーミング実行
+    private func runLlamaCompletionStream(prompt: String) -> AsyncThrowingStream<String, Error> {
+        let modelPath = self.modelPath
+        let llamaPath = self.llamaCompletionPath
+        let maxTokens = self.config.maxTokens
+        let contextSize = self.config.contextSize
+        let temperature = self.config.temperature
+        let stopTokens = self.adapter.stopTokens
+        let adapter = self.adapter
+
+        return AsyncThrowingStream { continuation in
+            DispatchQueue(label: "llama-stream", qos: .userInitiated).async {
+                let process = Process()
+                process.executableURL = URL(fileURLWithPath: llamaPath)
+
+                var arguments = [
+                    "-m", modelPath,
+                    "-p", prompt,
+                    "-n", String(maxTokens),
+                    "-c", String(contextSize),
+                    "--temp", String(temperature),
+                    "--no-display-prompt",
+                    "--no-conversation",
+                ]
+
+                for token in stopTokens {
+                    arguments += ["-r", token]
+                }
+
+                process.arguments = arguments
+
+                // PTY を作成（子プロセスが端末接続と認識し、stdout を逐次フラッシュする）
+                var masterFd: Int32 = 0
+                var slaveFd: Int32 = 0
+                guard openpty(&masterFd, &slaveFd, nil, nil, nil) == 0 else {
+                    continuation.finish(throwing: TranslationError.translationFailed(
+                        message: "PTY の作成に失敗しました"
+                    ))
+                    return
+                }
+
+                // Raw モード（\n → \r\n 変換等を無効化）
+                var rawAttr = Darwin.termios()
+                tcgetattr(masterFd, &rawAttr)
+                cfmakeraw(&rawAttr)
+                tcsetattr(masterFd, TCSANOW, &rawAttr)
+
+                process.standardOutput = FileHandle(fileDescriptor: slaveFd, closeOnDealloc: false)
+                let errorPipe = Pipe()
+                process.standardError = errorPipe
+
+                do {
+                    try process.run()
+                } catch {
+                    close(masterFd)
+                    close(slaveFd)
+                    continuation.finish(throwing: TranslationError.translationFailed(
+                        message: error.localizedDescription
+                    ))
+                    return
+                }
+
+                // 親側では slave を閉じる（子プロセスが使用中）
+                close(slaveFd)
+
+                // master 側からトークンを逐次読み取り
+                // PTY master は子プロセス終了時に EIO を返すので read() で直接処理
+                var buf = [UInt8](repeating: 0, count: 4096)
+                while true {
+                    let n = Darwin.read(masterFd, &buf, buf.count)
+                    if n <= 0 { break }
+                    if let chunk = String(data: Data(buf[0..<n]), encoding: .utf8) {
+                        let cleaned = adapter.cleanStreamChunk(chunk)
+                        if !cleaned.isEmpty {
+                            continuation.yield(cleaned)
+                        }
+                    }
+                }
+
+                close(masterFd)
+                process.waitUntilExit()
+
+                if process.terminationStatus != 0 {
+                    let errorData = errorPipe.fileHandleForReading.readDataToEndOfFile()
+                    let errorString = String(data: errorData, encoding: .utf8) ?? "Unknown error"
+                    continuation.finish(throwing: TranslationError.translationFailed(
+                        message: "llama-completion エラー: \(errorString)"
+                    ))
+                } else {
+                    continuation.finish()
+                }
+            }
+        }
+    }
 
     /// llama-completion を実行（バックグラウンドスレッドで）
     private func runLlamaCompletion(prompt: String) async throws -> String {

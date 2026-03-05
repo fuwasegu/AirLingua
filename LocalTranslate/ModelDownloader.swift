@@ -77,9 +77,42 @@ class ModelDownloader: NSObject, ObservableObject {
             modelType: .qwen3_4b,
             licenseNote: "✅ 商用利用可（Apache 2.0）"
         ),
+        // Qwen3.5 モデル（最新・高性能・商用可）提供: lmstudio-community
+        ModelInfo(
+            name: "Qwen3.5-0.8B Q4_K_M（超軽量）",
+            fileName: "Qwen3.5-0.8B-Q4_K_M.gguf",
+            url: URL(string: "https://huggingface.co/lmstudio-community/Qwen3.5-0.8B-GGUF/resolve/main/Qwen3.5-0.8B-Q4_K_M.gguf")!,
+            sizeDescription: "約 0.6 GB",
+            modelType: .qwen35_0_8b,
+            licenseNote: "✅ 商用利用可（Apache 2.0）"
+        ),
+        ModelInfo(
+            name: "Qwen3.5-2B Q4_K_M（軽量）",
+            fileName: "Qwen3.5-2B-Q4_K_M.gguf",
+            url: URL(string: "https://huggingface.co/lmstudio-community/Qwen3.5-2B-GGUF/resolve/main/Qwen3.5-2B-Q4_K_M.gguf")!,
+            sizeDescription: "約 1.3 GB",
+            modelType: .qwen35_2b,
+            licenseNote: "✅ 商用利用可（Apache 2.0）"
+        ),
+        ModelInfo(
+            name: "Qwen3.5-4B Q4_K_M（バランス）",
+            fileName: "Qwen3.5-4B-Q4_K_M.gguf",
+            url: URL(string: "https://huggingface.co/lmstudio-community/Qwen3.5-4B-GGUF/resolve/main/Qwen3.5-4B-Q4_K_M.gguf")!,
+            sizeDescription: "約 2.9 GB",
+            modelType: .qwen35_4b,
+            licenseNote: "✅ 商用利用可（Apache 2.0）"
+        ),
+        ModelInfo(
+            name: "Qwen3.5-9B Q4_K_M（高品質）",
+            fileName: "Qwen3.5-9B-Q4_K_M.gguf",
+            url: URL(string: "https://huggingface.co/lmstudio-community/Qwen3.5-9B-GGUF/resolve/main/Qwen3.5-9B-Q4_K_M.gguf")!,
+            sizeDescription: "約 5.9 GB",
+            modelType: .qwen35_9b,
+            licenseNote: "✅ 商用利用可（Apache 2.0）"
+        ),
         // TranslateGemma モデル（Google製 翻訳特化・55言語対応）
         ModelInfo(
-            name: "TranslateGemma-4B Q4_K_M（NEW!）",
+            name: "TranslateGemma-4B Q4_K_M",
             fileName: "translategemma-4b-it-Q4_K_M.gguf",
             url: URL(string: "https://huggingface.co/bullerwins/translategemma-4b-it-GGUF/resolve/main/translategemma-4b-it-Q4_K_M.gguf")!,
             sizeDescription: "約 2.5 GB",
