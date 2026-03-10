@@ -117,41 +117,63 @@ jobs:
           echo "=== Original llama-completion dependencies ==="
           otool -L "$LLAMA_BIN"
 
-          # Function to find and copy a library with the exact name expected
-          copy_lib() {
-            local expected_name="$1"
+          # Copy a dependency into the bundle
+          # Usage: copy_dep "@rpath/libfoo.dylib" dest_dir
+          #        copy_dep "/opt/homebrew/opt/openssl@3/lib/libssl.3.dylib" dest_dir
+          copy_dep() {
+            local dep_path="$1"
             local dest_dir="$2"
+            local libname
+            libname=$(basename "$dep_path")
 
             # Skip if already copied
-            [ -f "$dest_dir/$expected_name" ] && return 0
+            [ -f "$dest_dir/$libname" ] && return 0
 
-            # Search paths
-            for searchpath in /opt/homebrew/lib /usr/local/lib; do
-              # Try exact name first
-              if [ -f "$searchpath/$expected_name" ]; then
-                cp -L "$searchpath/$expected_name" "$dest_dir/$expected_name"
-                echo "Copied: $searchpath/$expected_name"
-                return 0
-              fi
+            # If absolute path, copy directly from there
+            if [[ "$dep_path" == /* ]] && [ -f "$dep_path" ]; then
+              cp -L "$dep_path" "$dest_dir/$libname"
+              echo "Copied: $dep_path"
+              return 0
+            fi
 
-              # Try without version number (e.g., libfoo.0.dylib -> libfoo.dylib)
-              local base_name=$(echo "$expected_name" | sed 's/\.[0-9]*\.dylib/.dylib/')
-              if [ "$base_name" != "$expected_name" ] && [ -f "$searchpath/$base_name" ]; then
-                cp -L "$searchpath/$base_name" "$dest_dir/$expected_name"
-                echo "Copied: $searchpath/$base_name -> $expected_name"
+            # For @rpath references, search in known locations
+            for searchpath in /opt/homebrew/lib /usr/local/lib /opt/homebrew/opt/*/lib; do
+              if [ -f "$searchpath/$libname" ]; then
+                cp -L "$searchpath/$libname" "$dest_dir/$libname"
+                echo "Copied: $searchpath/$libname"
                 return 0
               fi
             done
 
-            echo "Warning: Could not find $expected_name"
+            # Try without version number (e.g., libfoo.0.dylib -> libfoo.dylib)
+            local base_name
+            base_name=$(echo "$libname" | sed 's/\.[0-9]*\.dylib/.dylib/')
+            if [ "$base_name" != "$libname" ]; then
+              for searchpath in /opt/homebrew/lib /usr/local/lib /opt/homebrew/opt/*/lib; do
+                if [ -f "$searchpath/$base_name" ]; then
+                  cp -L "$searchpath/$base_name" "$dest_dir/$libname"
+                  echo "Copied: $searchpath/$base_name -> $libname"
+                  return 0
+                fi
+              done
+            fi
+
+            echo "Warning: Could not find $libname"
             return 1
           }
 
-          # Copy all @rpath dependencies from llama-completion
+          # Check if a dependency should be bundled (non-system)
+          is_bundleable() {
+            local dep="$1"
+            [[ "$dep" == @rpath/* ]] || [[ "$dep" == /opt/homebrew/* ]] || [[ "$dep" == /usr/local/lib/* ]]
+          }
+
+          # Copy all non-system dependencies from llama-completion
           echo "=== Copying direct dependencies ==="
-          for dep in $(otool -L "$LLAMA_BIN" | grep "@rpath" | awk '{print $1}'); do
-            libname=$(basename "$dep")
-            copy_lib "$libname" "$RESOURCES_DIR"
+          otool -L "$LLAMA_BIN" | tail -n +2 | awk '{print $1}' | while read dep; do
+            if is_bundleable "$dep"; then
+              copy_dep "$dep" "$RESOURCES_DIR"
+            fi
           done
 
           # Recursively copy dependencies of dylibs (up to 3 levels deep)
@@ -159,9 +181,10 @@ jobs:
             echo "=== Copying nested dependencies (iteration $iteration) ==="
             for lib in "$RESOURCES_DIR"/*.dylib; do
               [ -f "$lib" ] || continue
-              for dep in $(otool -L "$lib" 2>/dev/null | grep "@rpath" | awk '{print $1}'); do
-                libname=$(basename "$dep")
-                copy_lib "$libname" "$RESOURCES_DIR"
+              otool -L "$lib" 2>/dev/null | tail -n +2 | awk '{print $1}' | while read dep; do
+                if is_bundleable "$dep"; then
+                  copy_dep "$dep" "$RESOURCES_DIR"
+                fi
               done
             done
           done
