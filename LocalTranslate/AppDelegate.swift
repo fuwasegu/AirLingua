@@ -554,11 +554,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // リサイズ可能なウィンドウ
         let window = NSPanel(
             contentRect: NSRect(x: 0, y: 0, width: windowWidth, height: windowHeight),
-            styleMask: [.titled, .closable, .resizable, .nonactivatingPanel, .utilityWindow],
+            styleMask: [.titled, .closable, .resizable, .fullSizeContentView, .nonactivatingPanel, .utilityWindow],
             backing: .buffered,
             defer: false
         )
-        window.title = "翻訳結果"
+        window.titlebarAppearsTransparent = true
+        window.standardWindowButton(.closeButton)?.isHidden = true
+        window.standardWindowButton(.miniaturizeButton)?.isHidden = true
+        window.standardWindowButton(.zoomButton)?.isHidden = true
         window.contentView = containerView
         window.isOpaque = false
         window.backgroundColor = .clear
