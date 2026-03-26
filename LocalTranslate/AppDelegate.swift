@@ -495,20 +495,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         headerLabel.autoresizingMask = [.minYMargin]
         containerView.addSubview(headerLabel)
 
-        // コピーボタン（右上、閉じるボタンの左）
-        let copyButton = NSButton(frame: NSRect(x: windowWidth - 80, y: headerY, width: 60, height: 20))
-        copyButton.bezelStyle = .inline
-        copyButton.isBordered = false
-        copyButton.title = "Copy"
-        copyButton.image = NSImage(systemSymbolName: "doc.on.doc", accessibilityDescription: "コピー")
-        copyButton.imagePosition = .imageLeading
-        copyButton.contentTintColor = .controlAccentColor
-        copyButton.font = NSFont.systemFont(ofSize: 11)
-        copyButton.target = self
-        copyButton.action = #selector(copyResultButtonClicked)
-        copyButton.autoresizingMask = [.minXMargin, .minYMargin]
-        containerView.addSubview(copyButton)
-
         // 閉じるボタン（右上に固定）
         let closeButton = NSButton(frame: NSRect(x: windowWidth - 32, y: headerY, width: 20, height: 20))
         closeButton.bezelStyle = .inline
@@ -519,6 +505,26 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         closeButton.action = #selector(closeResultButtonClicked)
         closeButton.autoresizingMask = [.minXMargin, .minYMargin]
         containerView.addSubview(closeButton)
+
+        // コピーボタン（右上、閉じるボタンの左）
+        let copyButton = NSButton(frame: .zero)
+        copyButton.bezelStyle = .inline
+        copyButton.isBordered = false
+        copyButton.title = "Copy"
+        copyButton.image = NSImage(systemSymbolName: "doc.on.doc", accessibilityDescription: "コピー")
+        copyButton.imagePosition = .imageLeading
+        copyButton.contentTintColor = .controlAccentColor
+        copyButton.font = NSFont.systemFont(ofSize: 11)
+        copyButton.target = self
+        copyButton.action = #selector(copyResultButtonClicked)
+        copyButton.sizeToFit()
+        copyButton.frame.size.height = 20
+        copyButton.frame.origin = NSPoint(
+            x: closeButton.frame.minX - copyButton.frame.width,
+            y: headerY
+        )
+        copyButton.autoresizingMask = [.minXMargin, .minYMargin]
+        containerView.addSubview(copyButton)
 
         // 区切り線（上部に固定）
         let separatorY = windowHeight - 40
@@ -588,14 +594,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // ボタンのテキストを一時的に変更してフィードバック
         let originalTitle = sender.title
+        let rightEdge = sender.frame.maxX
+        let originalY = sender.frame.origin.y
+        let originalHeight = sender.frame.height
         sender.title = "Copied!"
         sender.image = NSImage(systemSymbolName: "checkmark", accessibilityDescription: nil)
         sender.contentTintColor = .systemGreen
+        sender.sizeToFit()
+        sender.frame = NSRect(x: rightEdge - sender.frame.width, y: originalY, width: sender.frame.width, height: originalHeight)
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
             sender.title = originalTitle
             sender.image = NSImage(systemSymbolName: "doc.on.doc", accessibilityDescription: nil)
             sender.contentTintColor = .controlAccentColor
+            sender.sizeToFit()
+            sender.frame = NSRect(x: rightEdge - sender.frame.width, y: originalY, width: sender.frame.width, height: originalHeight)
         }
     }
 
