@@ -256,30 +256,38 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         )
     }
 
-    /// 選択テキストをコピーして翻訳
-    /// - アクセシビリティ権限あり: 自動で ⌘C → 翻訳（1ステップ）
+    /// 選択テキストを取得して翻訳
+    /// - アクセシビリティ権限あり: AX API で選択テキスト直接取得 → 翻訳（取得できない場合は ⌘C フォールバック）
     /// - 権限未許可（初回）: プロンプトを表示して中断
     /// - 権限拒否済み: クリップボードの既存テキストを翻訳（⌘C → ショートカットの2ステップ）
     nonisolated private func translateSelectedText(to language: Language) {
         if AXIsProcessTrusted() {
-            // 権限あり: ⌘C シミュレートで選択テキストを自動取得
-            let savedChangeCount = NSPasteboard.general.changeCount
+            // 権限あり: Accessibility API で選択テキストを直接取得（クリップボード非使用）
+            let text = getSelectedTextViaAccessibility()
 
-            let source = CGEventSource(stateID: .combinedSessionState)
-            let cKeyDown = CGEvent(keyboardEventSource: source, virtualKey: 0x08, keyDown: true)
-            cKeyDown?.flags = .maskCommand
-            cKeyDown?.post(tap: .cghidEventTap)
-            let cKeyUp = CGEvent(keyboardEventSource: source, virtualKey: 0x08, keyDown: false)
-            cKeyUp?.flags = .maskCommand
-            cKeyUp?.post(tap: .cghidEventTap)
-
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                // コピーできたら翻訳、できなければ（未選択）何もしない
-                guard NSPasteboard.general.changeCount != savedChangeCount else { return }
-                guard let text = NSPasteboard.general.string(forType: .string), !text.isEmpty else { return }
-
+            if let text, !text.isEmpty {
                 Task { @MainActor [weak self] in
                     await self?.quickTranslate(text: text, to: language)
+                }
+            } else {
+                // AX で取得できない場合は ⌘C フォールバック
+                let savedChangeCount = NSPasteboard.general.changeCount
+
+                let source = CGEventSource(stateID: .privateState)
+                let cKeyDown = CGEvent(keyboardEventSource: source, virtualKey: 0x08, keyDown: true)
+                cKeyDown?.flags = .maskCommand
+                cKeyDown?.post(tap: .cghidEventTap)
+                let cKeyUp = CGEvent(keyboardEventSource: source, virtualKey: 0x08, keyDown: false)
+                cKeyUp?.flags = .maskCommand
+                cKeyUp?.post(tap: .cghidEventTap)
+
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                    guard NSPasteboard.general.changeCount != savedChangeCount else { return }
+                    guard let text = NSPasteboard.general.string(forType: .string), !text.isEmpty else { return }
+
+                    Task { @MainActor [weak self] in
+                        await self?.quickTranslate(text: text, to: language)
+                    }
                 }
             }
         } else if !UserDefaults.standard.bool(forKey: "accessibilityPrompted") {
@@ -296,6 +304,27 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 await self?.quickTranslate(text: text, to: language)
             }
         }
+    }
+
+    /// Accessibility API でフォーカス中の要素から選択テキストを取得
+    nonisolated private func getSelectedTextViaAccessibility() -> String? {
+        let systemWide = AXUIElementCreateSystemWide()
+        var focusedElement: AnyObject?
+        let focusResult = AXUIElementCopyAttributeValue(
+            systemWide,
+            kAXFocusedUIElementAttribute as CFString,
+            &focusedElement
+        )
+        guard focusResult == .success, let element = focusedElement else { return nil }
+
+        var selectedText: AnyObject?
+        let textResult = AXUIElementCopyAttributeValue(
+            element as! AXUIElement,
+            kAXSelectedTextAttribute as CFString,
+            &selectedText
+        )
+        guard textResult == .success, let text = selectedText as? String else { return nil }
+        return text
     }
 
     // MARK: - Services
