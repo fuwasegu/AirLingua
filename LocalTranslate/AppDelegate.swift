@@ -123,46 +123,91 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let menu = NSMenu()
         menu.delegate = self
 
-        // タイトル（モデル名）
-        let titleItem = NSMenuItem(title: "AirLingua", action: nil, keyEquivalent: "")
+        // タイトル
+        let titleItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        titleItem.attributedTitle = NSAttributedString(
+            string: "AirLingua",
+            attributes: [.font: NSFont.systemFont(ofSize: 13, weight: .semibold)]
+        )
         menu.addItem(titleItem)
 
-        // 現在のモデル表示
-        let modelItem = NSMenuItem(title: "モデル: \(translationManager.modelType.displayName)", action: nil, keyEquivalent: "")
-        modelItem.isEnabled = false
+        // ステータス情報（小さめのセカンダリカラー）
+        let statusAttrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 11),
+            .foregroundColor: NSColor.secondaryLabelColor,
+        ]
+
+        let modelItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        modelItem.attributedTitle = NSAttributedString(
+            string: "  モデル: \(translationManager.modelType.displayName)",
+            attributes: statusAttrs
+        )
         menu.addItem(modelItem)
 
-        // メモリ使用量
-        let memoryItem = NSMenuItem(title: "メモリ: \(memoryMonitor.formattedUsage)", action: nil, keyEquivalent: "")
-        memoryItem.isEnabled = false
+        let memoryItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        memoryItem.attributedTitle = NSAttributedString(
+            string: "  メモリ: \(memoryMonitor.formattedUsage)",
+            attributes: statusAttrs
+        )
         menu.addItem(memoryItem)
         self.memoryMenuItem = memoryItem
 
-        // ライセンス警告（PLaMoの場合）
         if translationManager.modelType == .plamo {
-            let licenseItem = NSMenuItem(title: "⚠️ 個人利用のみ", action: nil, keyEquivalent: "")
-            licenseItem.isEnabled = false
+            let licenseItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+            licenseItem.attributedTitle = NSAttributedString(
+                string: "  ⚠️ 個人利用のみ",
+                attributes: statusAttrs
+            )
             menu.addItem(licenseItem)
         }
 
         menu.addItem(NSMenuItem.separator())
 
-        // ショートカット案内
-        let jpShortcut = NSMenuItem(title: "⌃⌥J  日本語に翻訳", action: nil, keyEquivalent: "")
-        jpShortcut.isEnabled = false
+        // ショートカット案内（セクションヘッダー + キー表示）
+        let shortcutHeader = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        shortcutHeader.attributedTitle = NSAttributedString(
+            string: "ショートカット",
+            attributes: [
+                .font: NSFont.systemFont(ofSize: 11, weight: .medium),
+                .foregroundColor: NSColor.secondaryLabelColor,
+            ]
+        )
+        menu.addItem(shortcutHeader)
+
+        let shortcutAttrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.monospacedSystemFont(ofSize: 12, weight: .regular),
+        ]
+
+        let jpShortcut = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        jpShortcut.attributedTitle = NSAttributedString(
+            string: "  ⌃⌥J  日本語に翻訳",
+            attributes: shortcutAttrs
+        )
         menu.addItem(jpShortcut)
 
-        let enShortcut = NSMenuItem(title: "⌃⌥E  英語に翻訳", action: nil, keyEquivalent: "")
-        enShortcut.isEnabled = false
+        let enShortcut = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+        enShortcut.attributedTitle = NSAttributedString(
+            string: "  ⌃⌥E  英語に翻訳",
+            attributes: shortcutAttrs
+        )
         menu.addItem(enShortcut)
 
         if AXIsProcessTrusted() {
-            let hintItem = NSMenuItem(title: "テキスト選択 → ショートカットで翻訳", action: nil, keyEquivalent: "")
-            hintItem.isEnabled = false
+            let hintItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
+            hintItem.attributedTitle = NSAttributedString(
+                string: "  テキストを選択してショートカットキーを押す",
+                attributes: statusAttrs
+            )
             menu.addItem(hintItem)
         } else {
-            let hintItem = NSMenuItem(title: "⚠ アクセシビリティ権限が必要です", action: nil, keyEquivalent: "")
-            hintItem.isEnabled = false
+            let hintItem = NSMenuItem(title: "", action: #selector(openAccessibilitySettings), keyEquivalent: "")
+            hintItem.attributedTitle = NSAttributedString(
+                string: "  ⚠ アクセシビリティ権限が必要です",
+                attributes: [
+                    .font: NSFont.systemFont(ofSize: 11),
+                    .foregroundColor: NSColor.systemOrange,
+                ]
+            )
             menu.addItem(hintItem)
         }
 
@@ -182,6 +227,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// 設定ウィンドウ（strong参照で保持）
     private var settingsWindow: NSWindow?
+
+    @objc private func openAccessibilitySettings() {
+        AXIsProcessTrustedWithOptions(
+            [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+        )
+    }
 
     @objc private func openSettings() {
         // 既存のウィンドウがあれば前面に
@@ -801,7 +852,7 @@ extension AppDelegate: NSMenuDelegate {
     /// AppKit はメインスレッドでコールバックを呼ぶため、Task は即座に実行される。
     nonisolated func menuWillOpen(_ menu: NSMenu) {
         Task { @MainActor in
-            memoryMenuItem?.title = "メモリ: \(memoryMonitor.formattedUsage)"
+            updateStatusBarMenu()
         }
     }
 }
