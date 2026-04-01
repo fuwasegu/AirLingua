@@ -50,6 +50,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // グローバルホットキーを登録
         setupGlobalHotkey()
 
+        // アクセシビリティ権限チェック（アップデートで署名が変わると権限が切れる）
+        checkAccessibilityPermission()
+
         // モデルを自動ロード
         Task {
             await translationManager.loadModel()
@@ -73,6 +76,34 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         print("DEBUG: applicationShouldTerminateAfterLastWindowClosed called, returning false")
         return false
+    }
+
+    /// アクセシビリティ権限をチェックし、必要に応じてユーザーに案内する
+    private func checkAccessibilityPermission() {
+        guard !AXIsProcessTrusted() else { return }
+
+        // 一度も許可されたことがない場合はシステムダイアログで案内
+        if !UserDefaults.standard.bool(forKey: "accessibilityPrompted") {
+            UserDefaults.standard.set(true, forKey: "accessibilityPrompted")
+            AXIsProcessTrustedWithOptions(
+                [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+            )
+            return
+        }
+
+        // 以前は許可されていたのに無効になった場合（アップデートで署名が変わった等）
+        let alert = NSAlert()
+        alert.messageText = "アクセシビリティ権限の再設定が必要です"
+        alert.informativeText = "アプリのアップデートにより権限が無効になりました。\n「システム設定」→「アクセシビリティ」で AirLingua を一度削除してから再度追加してください。"
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "設定を開く")
+        alert.addButton(withTitle: "後で")
+
+        if alert.runModal() == .alertFirstButtonReturn {
+            AXIsProcessTrustedWithOptions(
+                [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+            )
+        }
     }
 
     // MARK: - Status Bar
@@ -130,7 +161,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             hintItem.isEnabled = false
             menu.addItem(hintItem)
         } else {
-            let hintItem = NSMenuItem(title: "⌘C → ショートカットで翻訳", action: nil, keyEquivalent: "")
+            let hintItem = NSMenuItem(title: "⚠ アクセシビリティ権限が必要です", action: nil, keyEquivalent: "")
             hintItem.isEnabled = false
             menu.addItem(hintItem)
         }
@@ -257,9 +288,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// 選択テキストを取得して翻訳
-    /// - アクセシビリティ権限あり: AX API で選択テキスト直接取得 → 翻訳（取得できない場合は ⌘C フォールバック）
-    /// - 権限未許可（初回）: プロンプトを表示して中断
-    /// - 権限拒否済み: クリップボードの既存テキストを翻訳（⌘C → ショートカットの2ステップ）
+    /// - AX API で選択テキスト直接取得 → 翻訳
+    /// - AX 失敗時は ⌘C シミュレートでフォールバック
+    /// - いずれも失敗した場合は何もしない
     nonisolated private func translateSelectedText(to language: Language) {
         // 1. AX API で選択テキストを直接取得（権限があれば成功、なければ nil）
         let axText = getSelectedTextViaAccessibility()
@@ -293,20 +324,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
 
-            // 3. AX も ⌘C も失敗: クリップボードの既存テキストをフォールバック
-            if let text = NSPasteboard.general.string(forType: .string), !text.isEmpty {
-                Task { @MainActor [weak self] in
-                    await self?.quickTranslate(text: text, to: language)
-                }
-            }
-
-            // 初回のみアクセシビリティ許可プロンプトを表示
-            if !AXIsProcessTrusted() && !UserDefaults.standard.bool(forKey: "accessibilityPrompted") {
-                UserDefaults.standard.set(true, forKey: "accessibilityPrompted")
-                AXIsProcessTrustedWithOptions(
-                    [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
-                )
-            }
+            // AX も ⌘C も失敗: 選択テキストが取得できなかったので何もしない
         }
     }
 
