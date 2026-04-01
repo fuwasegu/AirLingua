@@ -167,6 +167,25 @@ public final class LlamaCppTranslator: TranslationService {
         return env
     }
 
+    /// ggml バックエンドプラグインの検索用カレントディレクトリを決定
+    ///
+    /// libggml は GGML_BACKEND_DIR（コンパイル時定数）→ 実行ファイルのディレクトリ → cwd の順で
+    /// バックエンドプラグインを検索する。Homebrew の ggml バージョンが上がると GGML_BACKEND_DIR の
+    /// Cellar パスが存在しなくなるため、cwd フォールバックで正しいパスを指す。
+    /// リリースビルドでは .so を llama-completion と同じディレクトリに同梱するため不要。
+    private static func findGgmlBackendDir() -> String? {
+        let candidates = [
+            "/opt/homebrew/opt/ggml/libexec",
+            "/usr/local/opt/ggml/libexec",
+        ]
+        for path in candidates {
+            if FileManager.default.fileExists(atPath: path) {
+                return path
+            }
+        }
+        return nil
+    }
+
     /// llama-completion をストリーミング実行
     private func runLlamaCompletionStream(prompt: String) -> AsyncThrowingStream<String, Error> {
         let modelPath = self.modelPath
@@ -178,12 +197,16 @@ public final class LlamaCppTranslator: TranslationService {
         let stopTokens = self.adapter.stopTokens
         let adapter = self.adapter
         let env = self.processEnvironment()
+        let backendDir = Self.findGgmlBackendDir()
 
         return AsyncThrowingStream { continuation in
             DispatchQueue(label: "llama-stream", qos: .userInitiated).async {
                 let process = Process()
                 process.executableURL = URL(fileURLWithPath: llamaPath)
                 process.environment = env
+                if let backendDir {
+                    process.currentDirectoryURL = URL(fileURLWithPath: backendDir)
+                }
 
                 var arguments = [
                     "-m", modelPath,
@@ -277,11 +300,15 @@ public final class LlamaCppTranslator: TranslationService {
         let stopTokens = self.adapter.stopTokens
 
         let env = self.processEnvironment()
+        let backendDir = Self.findGgmlBackendDir()
 
         return try await Task.detached(priority: .userInitiated) {
             let process = Process()
             process.executableURL = URL(fileURLWithPath: llamaPath)
             process.environment = env
+            if let backendDir {
+                process.currentDirectoryURL = URL(fileURLWithPath: backendDir)
+            }
 
             var arguments = [
                 "-m", modelPath,
