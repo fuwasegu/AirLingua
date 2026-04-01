@@ -261,47 +261,51 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// - 権限未許可（初回）: プロンプトを表示して中断
     /// - 権限拒否済み: クリップボードの既存テキストを翻訳（⌘C → ショートカットの2ステップ）
     nonisolated private func translateSelectedText(to language: Language) {
-        if AXIsProcessTrusted() {
-            // 権限あり: Accessibility API で選択テキストを直接取得（クリップボード非使用）
-            let text = getSelectedTextViaAccessibility()
+        // 1. AX API で選択テキストを直接取得（権限があれば成功、なければ nil）
+        let axText = getSelectedTextViaAccessibility()
 
-            if let text, !text.isEmpty {
-                Task { @MainActor [weak self] in
-                    await self?.quickTranslate(text: text, to: language)
-                }
-            } else {
-                // AX で取得できない場合は ⌘C フォールバック
-                let savedChangeCount = NSPasteboard.general.changeCount
+        if let axText, !axText.isEmpty {
+            Task { @MainActor [weak self] in
+                await self?.quickTranslate(text: axText, to: language)
+            }
+            return
+        }
 
-                let source = CGEventSource(stateID: .privateState)
-                let cKeyDown = CGEvent(keyboardEventSource: source, virtualKey: 0x08, keyDown: true)
-                cKeyDown?.flags = .maskCommand
-                cKeyDown?.post(tap: .cghidEventTap)
-                let cKeyUp = CGEvent(keyboardEventSource: source, virtualKey: 0x08, keyDown: false)
-                cKeyUp?.flags = .maskCommand
-                cKeyUp?.post(tap: .cghidEventTap)
+        // 2. ⌘C シミュレートで選択テキストをコピー（権限不足なら空振りする）
+        let savedChangeCount = NSPasteboard.general.changeCount
 
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                    guard NSPasteboard.general.changeCount != savedChangeCount else { return }
-                    guard let text = NSPasteboard.general.string(forType: .string), !text.isEmpty else { return }
+        let source = CGEventSource(stateID: .privateState)
+        let cKeyDown = CGEvent(keyboardEventSource: source, virtualKey: 0x08, keyDown: true)
+        cKeyDown?.flags = .maskCommand
+        cKeyDown?.post(tap: .cghidEventTap)
+        let cKeyUp = CGEvent(keyboardEventSource: source, virtualKey: 0x08, keyDown: false)
+        cKeyUp?.flags = .maskCommand
+        cKeyUp?.post(tap: .cghidEventTap)
 
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            if NSPasteboard.general.changeCount != savedChangeCount {
+                // ⌘C 成功: コピーされたテキストを翻訳
+                if let text = NSPasteboard.general.string(forType: .string), !text.isEmpty {
                     Task { @MainActor [weak self] in
                         await self?.quickTranslate(text: text, to: language)
                     }
+                    return
                 }
             }
-        } else if !UserDefaults.standard.bool(forKey: "accessibilityPrompted") {
-            // 初回: プロンプトを表示（配布先ユーザーは一度許可すればOK）
-            UserDefaults.standard.set(true, forKey: "accessibilityPrompted")
-            AXIsProcessTrustedWithOptions(
-                [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
-            )
-        } else {
-            // 権限なし（プロンプト済み）: クリップボードの既存テキストを翻訳
-            guard let text = NSPasteboard.general.string(forType: .string), !text.isEmpty else { return }
 
-            Task { @MainActor [weak self] in
-                await self?.quickTranslate(text: text, to: language)
+            // 3. AX も ⌘C も失敗: クリップボードの既存テキストをフォールバック
+            if let text = NSPasteboard.general.string(forType: .string), !text.isEmpty {
+                Task { @MainActor [weak self] in
+                    await self?.quickTranslate(text: text, to: language)
+                }
+            }
+
+            // 初回のみアクセシビリティ許可プロンプトを表示
+            if !AXIsProcessTrusted() && !UserDefaults.standard.bool(forKey: "accessibilityPrompted") {
+                UserDefaults.standard.set(true, forKey: "accessibilityPrompted")
+                AXIsProcessTrustedWithOptions(
+                    [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+                )
             }
         }
     }

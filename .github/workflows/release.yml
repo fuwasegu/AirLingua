@@ -114,6 +114,25 @@ jobs:
           cp "$LLAMA_BIN" "$RESOURCES_DIR/"
           chmod +x "$RESOURCES_DIR/llama-completion"
 
+          # Bundle ggml backend plugins (Metal, CPU variants, etc.)
+          # ggml_backend_load_best() searches: GGML_BACKEND_DIR (compile-time) →
+          # executable directory → cwd. By placing .so files next to llama-completion
+          # in Resources/, the "executable directory" fallback finds them.
+          GGML_LIBEXEC="/opt/homebrew/opt/ggml/libexec"
+          if [ ! -d "$GGML_LIBEXEC" ]; then
+            echo "::error::ggml libexec not found at $GGML_LIBEXEC"
+            exit 1
+          fi
+          echo "=== Copying ggml backend plugins ==="
+          cp -L "$GGML_LIBEXEC"/*.so "$RESOURCES_DIR/"
+          BACKEND_COUNT=$(ls "$RESOURCES_DIR"/*.so 2>/dev/null | wc -l)
+          if [ "$BACKEND_COUNT" -eq 0 ]; then
+            echo "::error::No ggml backend plugins (.so) found in $GGML_LIBEXEC"
+            exit 1
+          fi
+          echo "Bundled $BACKEND_COUNT backend plugin(s):"
+          ls -la "$RESOURCES_DIR"/*.so
+
           echo "=== Original llama-completion dependencies ==="
           otool -L "$LLAMA_BIN"
 
@@ -176,10 +195,10 @@ jobs:
             fi
           done
 
-          # Recursively copy dependencies of dylibs (up to 3 levels deep)
+          # Recursively copy dependencies of dylibs and backend plugins (up to 3 levels deep)
           for iteration in 1 2 3; do
             echo "=== Copying nested dependencies (iteration $iteration) ==="
-            for lib in "$RESOURCES_DIR"/*.dylib; do
+            for lib in "$RESOURCES_DIR"/*.dylib "$RESOURCES_DIR"/*.so; do
               [ -f "$lib" ] || continue
               otool -L "$lib" 2>/dev/null | tail -n +2 | awk '{print $1}' | while read dep; do
                 if is_bundleable "$dep"; then
@@ -191,7 +210,7 @@ jobs:
 
           # Fix all rpaths - change @rpath to @loader_path
           echo "=== Fixing rpaths ==="
-          for file in "$RESOURCES_DIR/llama-completion" "$RESOURCES_DIR"/*.dylib; do
+          for file in "$RESOURCES_DIR/llama-completion" "$RESOURCES_DIR"/*.dylib "$RESOURCES_DIR"/*.so; do
             [ -f "$file" ] || continue
             filename=$(basename "$file")
             echo "Fixing: $filename"
@@ -212,7 +231,7 @@ jobs:
 
           # Re-sign all modified binaries (required after install_name_tool)
           echo "=== Re-signing binaries ==="
-          for file in "$RESOURCES_DIR/llama-completion" "$RESOURCES_DIR"/*.dylib; do
+          for file in "$RESOURCES_DIR/llama-completion" "$RESOURCES_DIR"/*.dylib "$RESOURCES_DIR"/*.so; do
             [ -f "$file" ] || continue
             codesign --force --sign - "$file"
             echo "Signed: $(basename "$file")"
