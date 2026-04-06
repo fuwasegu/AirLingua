@@ -8,12 +8,14 @@ struct Qwen3Adapter: ModelAdapter {
 
     func buildPrompt(text: String, source: Language, target: Language) -> String {
         // Qwen3 ChatML 形式（/no_think で思考モードを無効化）
-        let systemPrompt = "You are a translator. Translate the given text accurately and completely. Output only the translation without any explanations or preambles."
-
+        let systemPrompt: String
         let userPrompt: String
+
         if target == .japanese {
-            userPrompt = "Translate the following English text to Japanese:\n\n\(text) /no_think"
+            systemPrompt = "あなたは翻訳者です。与えられたテキストを正確かつ自然な日本語に翻訳してください。翻訳結果のみを出力してください。"
+            userPrompt = "以下の英文を日本語に翻訳してください:\n\n\(text) /no_think"
         } else {
+            systemPrompt = "You are a translator. Translate the given text accurately and completely. Output only the translation without any explanations or preambles."
             userPrompt = "Translate the following Japanese text to English:\n\n\(text) /no_think"
         }
 
