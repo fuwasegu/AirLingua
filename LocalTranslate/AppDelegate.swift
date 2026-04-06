@@ -123,12 +123,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let menu = NSMenu()
         menu.delegate = self
 
-        // タイトル
+        // タイトル + バージョン
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
         let titleItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
-        titleItem.attributedTitle = NSAttributedString(
+        let titleString = NSMutableAttributedString(
             string: "AirLingua",
             attributes: [.font: NSFont.systemFont(ofSize: 13, weight: .semibold)]
         )
+        titleString.append(NSAttributedString(
+            string: "  v\(version)",
+            attributes: [
+                .font: NSFont.systemFont(ofSize: 11),
+                .foregroundColor: NSColor.tertiaryLabelColor,
+            ]
+        ))
+        titleItem.attributedTitle = titleString
         menu.addItem(titleItem)
 
         // ステータス情報（小さめのセカンダリカラー）

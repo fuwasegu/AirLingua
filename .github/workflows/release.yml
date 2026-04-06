@@ -98,12 +98,14 @@ jobs:
 
       - name: Build
         run: |
+          VERSION=${GITHUB_REF_NAME#v}
           xcodebuild -project LocalTranslate.xcodeproj \
             -scheme LocalTranslate \
             -configuration Release \
             -derivedDataPath build \
             CODE_SIGN_IDENTITY="-" \
-            CODE_SIGNING_REQUIRED=NO
+            CODE_SIGNING_REQUIRED=NO \
+            MARKETING_VERSION="$VERSION"
 
       - name: Prepare App Bundle
         run: |
