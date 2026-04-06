@@ -23,7 +23,15 @@ jobs:
 
       - name: Install llama.cpp
         run: |
+          brew update
           brew install llama.cpp
+          # Gemma 4 support requires build >= 8670 (GGML >= 0.9.11)
+          LLAMA_VER=$(/opt/homebrew/bin/llama-completion --version 2>&1 | grep -oE 'version: [0-9]+' | grep -oE '[0-9]+')
+          echo "llama.cpp version: $LLAMA_VER"
+          if [ -n "$LLAMA_VER" ] && [ "$LLAMA_VER" -lt 8670 ]; then
+            echo "::error::llama.cpp version $LLAMA_VER is too old (need >= 8670 for Gemma 4 support)"
+            exit 1
+          fi
 
       - name: Create App Icon
         run: |
