@@ -119,6 +119,15 @@ class ModelDownloader: NSObject, ObservableObject {
             modelType: .translateGemma,
             licenseNote: "✅ 商用利用可（Gemma License）"
         ),
+        // Gemma 4 E4B モデル（Google製 高性能汎用・140言語以上対応）
+        ModelInfo(
+            name: "Gemma 4 E4B Q4_K_M",
+            fileName: "gemma-4-E4B-it-Q4_K_M.gguf",
+            url: URL(string: "https://huggingface.co/unsloth/gemma-4-E4B-it-GGUF/resolve/main/gemma-4-E4B-it-Q4_K_M.gguf")!,
+            sizeDescription: "約 5.0 GB",
+            modelType: .gemma4_e4b,
+            licenseNote: "✅ 商用利用可（Apache 2.0）"
+        ),
     ]
 
     /// モデル保存ディレクトリ
