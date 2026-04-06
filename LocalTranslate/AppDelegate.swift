@@ -598,7 +598,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         containerView.addSubview(headerLabel)
 
         // 閉じるボタン（右上に固定）
-        let closeButton = NSButton(frame: NSRect(x: windowWidth - 32, y: headerY, width: 20, height: 20))
+        let closeButton = HoverButton(frame: NSRect(x: windowWidth - 32, y: headerY, width: 20, height: 20))
         closeButton.bezelStyle = .inline
         closeButton.isBordered = false
         closeButton.image = NSImage(systemSymbolName: "xmark.circle.fill", accessibilityDescription: "閉じる")
@@ -609,7 +609,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         containerView.addSubview(closeButton)
 
         // コピーボタン（右上、閉じるボタンの左）
-        let copyButton = NSButton(frame: .zero)
+        let copyButton = HoverButton(frame: .zero)
         copyButton.bezelStyle = .inline
         copyButton.isBordered = false
         copyButton.title = "Copy"
