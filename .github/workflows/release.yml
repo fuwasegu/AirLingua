@@ -339,14 +339,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Cleanup Keychain and Trust Settings
+      - name: Cleanup Keychain
         if: always()
+        timeout-minutes: 1
         run: |
-          # Remove trust settings added by add-trusted-cert (important for self-hosted runners)
-          if security find-certificate -a -p "$KEYCHAIN_PATH" > "$RUNNER_TEMP/cleanup-cert.pem" 2>/dev/null; then
-            sudo security remove-trusted-cert -d "$RUNNER_TEMP/cleanup-cert.pem" 2>/dev/null || true
-            rm -f "$RUNNER_TEMP/cleanup-cert.pem"
-          fi
+          # Deleting the keychain is sufficient for GitHub-hosted runners.
+          # The admin trust settings are ephemeral on hosted runners (VM is discarded).
           security delete-keychain "$KEYCHAIN_PATH" 2>/dev/null || true
 
       - name: Update Homebrew Tap
