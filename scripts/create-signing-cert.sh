@@ -71,7 +71,10 @@ openssl req -new -x509 \
   2>/dev/null
 
 # Export as .p12 (include both private key and certificate as an identity)
+# Use -legacy for macOS security command compatibility (OpenSSL 3.x defaults to
+# AES-256-CBC which macOS cannot import)
 openssl pkcs12 -export \
+  -legacy \
   -inkey "$TMPDIR/key.pem" \
   -in "$TMPDIR/cert.pem" \
   -name "$CERT_NAME" \
