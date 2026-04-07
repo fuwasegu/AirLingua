@@ -312,13 +312,13 @@ jobs:
           # Remove quarantine attribute
           xattr -cr "$APP_PATH"
 
-          # Sign the entire app bundle with the self-signed certificate
-          # --options runtime preserves hardened runtime (ENABLE_HARDENED_RUNTIME=YES)
-          # This ensures macOS TCC identifies the app by certificate, not CDHash
+          # Sign the app bundle (without --deep to avoid re-signing Resources/ binaries
+          # which were already individually signed above with the same identity).
+          # --deep can cause Team ID mismatches with self-signed certificates.
           echo "=== Signing app bundle ==="
-          codesign --force --deep --options runtime --sign "$SIGNING_IDENTITY" --keychain "$KEYCHAIN_PATH" "$APP_PATH"
+          codesign --force --options runtime --sign "$SIGNING_IDENTITY" --keychain "$KEYCHAIN_PATH" "$APP_PATH"
           echo "=== Verifying signature ==="
-          codesign --verify --deep --strict "$APP_PATH"
+          codesign --verify --strict "$APP_PATH"
           codesign -dvvv "$APP_PATH"
 
       - name: Create ZIP
