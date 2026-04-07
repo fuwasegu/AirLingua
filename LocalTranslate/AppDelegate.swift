@@ -624,7 +624,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         copyButton.title = "Copy"
         copyButton.image = NSImage(systemSymbolName: "doc.on.doc", accessibilityDescription: "コピー")
         copyButton.imagePosition = .imageLeading
-        copyButton.contentTintColor = .controlAccentColor
+        copyButton.contentTintColor = .secondaryLabelColor
         copyButton.font = NSFont.systemFont(ofSize: 11)
         copyButton.target = self
         copyButton.action = #selector(copyResultButtonClicked)
