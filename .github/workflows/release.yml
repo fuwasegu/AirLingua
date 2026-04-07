@@ -96,6 +96,53 @@ jobs:
 
           rm -rf AppIcon.iconset
 
+      - name: Setup Signing Certificate
+        env:
+          SIGNING_CERT_P12: ${{ secrets.SIGNING_CERT_P12 }}
+          SIGNING_CERT_PASSWORD: ${{ secrets.SIGNING_CERT_PASSWORD }}
+        run: |
+          KEYCHAIN_PATH="$RUNNER_TEMP/signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -hex 16)"
+
+          # Create temporary keychain
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          # Import as identity (key + cert pair)
+          CERT_PATH="$RUNNER_TEMP/cert.p12"
+          echo "$SIGNING_CERT_P12" | base64 --decode > "$CERT_PATH"
+          security import "$CERT_PATH" \
+            -P "$SIGNING_CERT_PASSWORD" \
+            -A \
+            -k "$KEYCHAIN_PATH"
+          rm "$CERT_PATH"
+
+          # Allow codesign to access the keychain without prompt
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          # Trust the self-signed certificate for code signing
+          # Extract the cert from keychain, add to trust settings
+          security find-certificate -a -p "$KEYCHAIN_PATH" > "$RUNNER_TEMP/cert.pem"
+          sudo security add-trusted-cert -d -r trustRoot -k "$KEYCHAIN_PATH" "$RUNNER_TEMP/cert.pem"
+          rm "$RUNNER_TEMP/cert.pem"
+
+          # Add to search list
+          security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
+
+          # Verify exactly one valid codesigning identity exists (fail-fast)
+          IDENTITY_OUTPUT=$(security find-identity -v -p codesigning "$KEYCHAIN_PATH")
+          VALID_COUNT=$(echo "$IDENTITY_OUTPUT" | tail -1 | grep -oE '[0-9]+')
+          if [ "$VALID_COUNT" -lt 1 ] 2>/dev/null; then
+            echo "::error::No valid codesigning identity found in keychain"
+            echo "$IDENTITY_OUTPUT"
+            exit 1
+          fi
+          IDENTITY=$(echo "$IDENTITY_OUTPUT" | head -1 | sed 's/.*"\(.*\)"/\1/')
+          echo "SIGNING_IDENTITY=$IDENTITY" >> $GITHUB_ENV
+          echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> $GITHUB_ENV
+          echo "Found $VALID_COUNT valid identity(ies). Using: $IDENTITY"
+
       - name: Build
         run: |
           VERSION=${GITHUB_REF_NAME#v}
@@ -103,8 +150,11 @@ jobs:
             -scheme LocalTranslate \
             -configuration Release \
             -derivedDataPath build \
-            CODE_SIGN_IDENTITY="-" \
-            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="$SIGNING_IDENTITY" \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM="" \
+            CODE_SIGNING_REQUIRED=YES \
+            OTHER_CODE_SIGN_FLAGS="--keychain $KEYCHAIN_PATH" \
             MARKETING_VERSION="$VERSION"
 
       - name: Prepare App Bundle
@@ -240,10 +290,11 @@ jobs:
           done
 
           # Re-sign all modified binaries (required after install_name_tool)
+          # Use the same self-signed certificate so TCC permissions persist across updates
           echo "=== Re-signing binaries ==="
           for file in "$RESOURCES_DIR/llama-completion" "$RESOURCES_DIR"/*.dylib "$RESOURCES_DIR"/*.so; do
             [ -f "$file" ] || continue
-            codesign --force --sign - "$file"
+            codesign --force --options runtime --sign "$SIGNING_IDENTITY" --keychain "$KEYCHAIN_PATH" "$file"
             echo "Signed: $(basename "$file")"
           done
 
@@ -260,6 +311,15 @@ jobs:
 
           # Remove quarantine attribute
           xattr -cr "$APP_PATH"
+
+          # Sign the entire app bundle with the self-signed certificate
+          # --options runtime preserves hardened runtime (ENABLE_HARDENED_RUNTIME=YES)
+          # This ensures macOS TCC identifies the app by certificate, not CDHash
+          echo "=== Signing app bundle ==="
+          codesign --force --deep --options runtime --sign "$SIGNING_IDENTITY" --keychain "$KEYCHAIN_PATH" "$APP_PATH"
+          echo "=== Verifying signature ==="
+          codesign --verify --deep --strict "$APP_PATH"
+          codesign -dvvv "$APP_PATH"
 
       - name: Create ZIP
         run: |
@@ -278,6 +338,16 @@ jobs:
           files: AirLingua-${{ env.VERSION }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Cleanup Keychain and Trust Settings
+        if: always()
+        run: |
+          # Remove trust settings added by add-trusted-cert (important for self-hosted runners)
+          if security find-certificate -a -p "$KEYCHAIN_PATH" > "$RUNNER_TEMP/cleanup-cert.pem" 2>/dev/null; then
+            sudo security remove-trusted-cert -d "$RUNNER_TEMP/cleanup-cert.pem" 2>/dev/null || true
+            rm -f "$RUNNER_TEMP/cleanup-cert.pem"
+          fi
+          security delete-keychain "$KEYCHAIN_PATH" 2>/dev/null || true
 
       - name: Update Homebrew Tap
         uses: peter-evans/repository-dispatch@v2

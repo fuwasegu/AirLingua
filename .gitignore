@@ -20,5 +20,8 @@ Pods/
 # Carthage
 Carthage/Build/
 
+# Signing
+*.p12
+
 # Debug
 *.log
