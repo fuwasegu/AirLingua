@@ -290,13 +290,24 @@ jobs:
           done
 
           # Re-sign all modified binaries (required after install_name_tool)
-          # Use the same self-signed certificate so TCC permissions persist across updates
-          echo "=== Re-signing binaries ==="
-          for file in "$RESOURCES_DIR/llama-completion" "$RESOURCES_DIR"/*.dylib "$RESOURCES_DIR"/*.so; do
+          # Use the same self-signed certificate so TCC permissions persist across updates.
+          #
+          # Libraries (.dylib/.so): signed without hardened runtime (not needed for libraries)
+          # llama-completion: signed WITH hardened runtime + disable-library-validation entitlement
+          #   (self-signed certs have no Apple Team ID, so Library Validation must be disabled
+          #    to allow loading the bundled dylibs)
+          echo "=== Re-signing libraries ==="
+          for file in "$RESOURCES_DIR"/*.dylib "$RESOURCES_DIR"/*.so; do
             [ -f "$file" ] || continue
-            codesign --force --options runtime --sign "$SIGNING_IDENTITY" --keychain "$KEYCHAIN_PATH" "$file"
+            codesign --force --sign "$SIGNING_IDENTITY" --keychain "$KEYCHAIN_PATH" "$file"
             echo "Signed: $(basename "$file")"
           done
+          echo "=== Re-signing llama-completion (hardened runtime + entitlements) ==="
+          codesign --force --options runtime \
+            --entitlements "$GITHUB_WORKSPACE/scripts/llama-entitlements.plist" \
+            --sign "$SIGNING_IDENTITY" --keychain "$KEYCHAIN_PATH" \
+            "$RESOURCES_DIR/llama-completion"
+          echo "Signed: llama-completion (hardened runtime + disable-library-validation)"
 
           # Debug: show what we bundled
           echo "=== Bundled files ==="
@@ -314,12 +325,24 @@ jobs:
 
           # Sign the app bundle (without --deep to avoid re-signing Resources/ binaries
           # which were already individually signed above with the same identity).
-          # --deep can cause Team ID mismatches with self-signed certificates.
           echo "=== Signing app bundle ==="
           codesign --force --options runtime --sign "$SIGNING_IDENTITY" --keychain "$KEYCHAIN_PATH" "$APP_PATH"
           echo "=== Verifying signature ==="
           codesign --verify --strict "$APP_PATH"
           codesign -dvvv "$APP_PATH"
+
+          # Smoke test: run llama-completion to verify dylib loading works
+          # This catches Team ID mismatches that codesign --verify does not detect.
+          # llama-completion --help loads backend .so plugins and exits 0 on success.
+          echo "=== Smoke test: llama-completion dylib loading ==="
+          if SMOKE_OUTPUT=$("$RESOURCES_DIR/llama-completion" --help 2>&1); then
+            echo "Smoke test passed: llama-completion loaded successfully"
+          else
+            EXIT_CODE=$?
+            echo "::error::Smoke test failed (exit code $EXIT_CODE). Output:"
+            echo "$SMOKE_OUTPUT"
+            exit 1
+          fi
 
       - name: Create ZIP
         run: |
