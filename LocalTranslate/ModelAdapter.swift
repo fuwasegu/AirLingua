@@ -75,6 +75,8 @@ extension ModelAdapter where Self == PLaMoAdapter {
         switch modelType {
         case .plamo:
             return PLaMoAdapter()
+        case .plamo3_0_8b, .plamo3_2b, .plamo3_8b:
+            return PLaMo3Adapter()
         case .elyza:
             return ElyzaAdapter()
         case .alma:
@@ -96,6 +98,8 @@ func createModelAdapter(for modelType: ModelType) -> ModelAdapter {
     switch modelType {
     case .plamo:
         return PLaMoAdapter()
+    case .plamo3_0_8b, .plamo3_2b, .plamo3_8b:
+        return PLaMo3Adapter()
     case .elyza:
         return ElyzaAdapter()
     case .alma:

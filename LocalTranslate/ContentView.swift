@@ -72,7 +72,7 @@ struct SettingsView: View {
                     }
 
                     // 現在のモデルのライセンス警告
-                    if modelType == .plamo {
+                    if modelType.isPLaMo {
                         HStack(spacing: 6) {
                             Image(systemName: "exclamationmark.triangle.fill")
                                 .foregroundColor(.orange)
@@ -222,6 +222,17 @@ struct SettingsView: View {
             if fileName.contains("elyza") || fileName.contains("llama") {
                 modelTypeRaw = ModelType.elyza.rawValue
                 translationManager.modelType = .elyza
+            } else if fileName.contains("plamo-3") || fileName.contains("plamo3") {
+                if fileName.contains("0.8b") {
+                    modelTypeRaw = ModelType.plamo3_0_8b.rawValue
+                    translationManager.modelType = .plamo3_0_8b
+                } else if fileName.contains("8b") {
+                    modelTypeRaw = ModelType.plamo3_8b.rawValue
+                    translationManager.modelType = .plamo3_8b
+                } else {
+                    modelTypeRaw = ModelType.plamo3_2b.rawValue
+                    translationManager.modelType = .plamo3_2b
+                }
             } else {
                 modelTypeRaw = ModelType.plamo.rawValue
                 translationManager.modelType = .plamo
@@ -246,7 +257,7 @@ struct SettingsView: View {
                 Text(model.name)
                 Text(model.licenseNote)
                     .font(.caption)
-                    .foregroundColor(model.modelType == .plamo ? .orange : .green)
+                    .foregroundColor(model.modelType.isPLaMo ? .orange : .green)
             }
 
             Spacer()

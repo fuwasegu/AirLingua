@@ -161,7 +161,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(memoryItem)
         self.memoryMenuItem = memoryItem
 
-        if translationManager.modelType == .plamo {
+        if translationManager.modelType.isPLaMo {
             let licenseItem = NSMenuItem(title: "", action: nil, keyEquivalent: "")
             licenseItem.attributedTitle = NSAttributedString(
                 string: "  ⚠️ 個人利用のみ",
