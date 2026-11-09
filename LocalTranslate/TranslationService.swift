@@ -56,6 +56,9 @@ public enum Language: String, CaseIterable, Identifiable {
 /// モデルタイプ
 public enum ModelType: String, CaseIterable, Identifiable {
     case plamo = "plamo"
+    case plamo3_0_8b = "plamo3_0_8b"
+    case plamo3_2b = "plamo3_2b"
+    case plamo3_8b = "plamo3_8b"
     case elyza = "elyza"
     case alma = "alma"
     case qwen3_8b = "qwen3_8b"
@@ -72,6 +75,9 @@ public enum ModelType: String, CaseIterable, Identifiable {
     public var displayName: String {
         switch self {
         case .plamo: return "PLaMo-2-translate"
+        case .plamo3_0_8b: return "PLaMo-3-translate 0.8B"
+        case .plamo3_2b: return "PLaMo-3-translate 2B"
+        case .plamo3_8b: return "PLaMo-3-translate 8B"
         case .elyza: return "ELYZA-JP-8B"
         case .alma: return "ALMA-7B-Ja"
         case .qwen3_8b: return "Qwen3-8B"
@@ -88,6 +94,9 @@ public enum ModelType: String, CaseIterable, Identifiable {
     public var description: String {
         switch self {
         case .plamo: return "PFN製 翻訳特化モデル（個人利用のみ）"
+        case .plamo3_0_8b: return "PFN製 超軽量翻訳特化モデル（53言語対応）"
+        case .plamo3_2b: return "PFN製 軽量翻訳特化モデル（53言語対応）"
+        case .plamo3_8b: return "PFN製 高品質翻訳特化モデル（53言語対応）"
         case .elyza: return "ELYZA製 汎用日本語モデル（商用可）"
         case .alma: return "翻訳特化モデル（商用可）"
         case .qwen3_8b: return "Qwen製 多言語汎用モデル（商用可）"
@@ -103,7 +112,8 @@ public enum ModelType: String, CaseIterable, Identifiable {
 
     public var licenseNote: String {
         switch self {
-        case .plamo: return "⚠️ PLaMo Community License - 個人利用のみ"
+        case .plamo, .plamo3_0_8b, .plamo3_2b, .plamo3_8b:
+            return "⚠️ PLaMo Community License - 個人利用のみ"
         case .elyza: return "✅ Llama 3 Community License - 商用利用可"
         case .alma: return "✅ MIT License - 商用利用可"
         case .qwen3_8b: return "✅ Apache 2.0 License - 商用利用可"
@@ -117,11 +127,20 @@ public enum ModelType: String, CaseIterable, Identifiable {
         }
     }
 
+    public var isPLaMo: Bool {
+        switch self {
+        case .plamo, .plamo3_0_8b, .plamo3_2b, .plamo3_8b:
+            return true
+        default:
+            return false
+        }
+    }
+
     public var isLegacy: Bool {
         switch self {
-        case .elyza, .alma, .qwen3_8b, .qwen3_4b:
+        case .plamo, .elyza, .alma, .qwen3_8b, .qwen3_4b:
             return true
-        case .plamo, .qwen35_0_8b, .qwen35_2b, .qwen35_4b, .qwen35_9b, .translateGemma, .gemma4_e4b:
+        case .plamo3_0_8b, .plamo3_2b, .plamo3_8b, .qwen35_0_8b, .qwen35_2b, .qwen35_4b, .qwen35_9b, .translateGemma, .gemma4_e4b:
             return false
         }
     }

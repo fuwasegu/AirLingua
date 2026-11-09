@@ -25,7 +25,32 @@ class ModelDownloader: NSObject, ObservableObject {
 
     /// ダウンロード可能なモデル一覧
     static let availableModels: [ModelInfo] = [
-        // PLaMo モデル（個人利用のみ）
+        // PLaMo 3 Translate モデル（PFN製 翻訳特化・53言語対応・個人利用のみ）
+        ModelInfo(
+            name: "PLaMo-3-translate 0.8B Q4_K_M（超軽量）",
+            fileName: "plamo-3-translate-0.8b-Q4_K_M.gguf",
+            url: URL(string: "https://huggingface.co/pfnet/plamo-3-translate-0.8b-GGUF/resolve/main/plamo-3-translate-0.8b-Q4_K_M.gguf")!,
+            sizeDescription: "約 0.6 GB",
+            modelType: .plamo3_0_8b,
+            licenseNote: "⚠️ 個人利用のみ"
+        ),
+        ModelInfo(
+            name: "PLaMo-3-translate 2B Q4_K_M（軽量）",
+            fileName: "plamo-3-translate-2b-Q4_K_M.gguf",
+            url: URL(string: "https://huggingface.co/pfnet/plamo-3-translate-2b-GGUF/resolve/main/plamo-3-translate-2b-Q4_K_M.gguf")!,
+            sizeDescription: "約 1.8 GB",
+            modelType: .plamo3_2b,
+            licenseNote: "⚠️ 個人利用のみ"
+        ),
+        ModelInfo(
+            name: "PLaMo-3-translate 8B Q4_K_M（高品質）",
+            fileName: "plamo-3-translate-8b-Q4_K_M.gguf",
+            url: URL(string: "https://huggingface.co/pfnet/plamo-3-translate-8b-GGUF/resolve/main/plamo-3-translate-8b-Q4_K_M.gguf")!,
+            sizeDescription: "約 5.3 GB",
+            modelType: .plamo3_8b,
+            licenseNote: "⚠️ 個人利用のみ"
+        ),
+        // PLaMo 2 モデル（個人利用のみ）
         ModelInfo(
             name: "PLaMo-2-translate Q3_K_M",
             fileName: "plamo-2-translate-Q3_K_M.gguf",
@@ -159,7 +184,7 @@ class ModelDownloader: NSObject, ObservableObject {
         if FileManager.default.fileExists(atPath: currentPath) {
             // ファイル名からタイプを推測
             let fileName = (currentPath as NSString).lastPathComponent.lowercased()
-            if type == .plamo && fileName.contains("plamo") {
+            if type.isPLaMo && fileName.contains("plamo") {
                 return true
             }
             if type == .elyza && (fileName.contains("elyza") || fileName.contains("llama")) {

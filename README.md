@@ -11,7 +11,7 @@
 - **完全ローカル処理** - インターネット接続不要、プライバシー安全
 - **右クリックで翻訳** - テキスト選択 → 右クリック → 「AirLingua: 日本語に翻訳」
 - **メニューバー常駐** - 軽量でいつでもアクセス可能
-- **複数モデル対応** - Gemma 4 / Qwen3.5 / TranslateGemma / PLaMo / ELYZA / ALMA
+- **複数モデル対応** - Gemma 4 / PLaMo 3 / Qwen3.5 / TranslateGemma / ELYZA / ALMA
 
 ## インストール
 
@@ -42,12 +42,15 @@ brew install --cask airlingua
 | モデル | サイズ | ライセンス | 備考 |
 |--------|--------|------------|------|
 | **Gemma 4 E4B** | ~5.0 GB | Apache 2.0 | **推奨** - Google製 高性能汎用、140言語以上 |
+| PLaMo-3-translate 8B | ~5.3 GB | PLaMo Community | PFN製 翻訳特化（高品質・53言語）、個人利用のみ |
+| PLaMo-3-translate 2B | ~1.8 GB | PLaMo Community | PFN製 翻訳特化（軽量・53言語）、個人利用のみ |
+| PLaMo-3-translate 0.8B | ~0.6 GB | PLaMo Community | PFN製 翻訳特化（超軽量・53言語）、個人利用のみ |
 | Qwen3.5-9B | ~5.9 GB | Apache 2.0 | 高品質 |
 | Qwen3.5-4B | ~2.9 GB | Apache 2.0 | バランス |
 | Qwen3.5-2B | ~1.3 GB | Apache 2.0 | 軽量 |
 | Qwen3.5-0.8B | ~0.6 GB | Apache 2.0 | 超軽量 |
 | TranslateGemma-4B | ~2.5 GB | Gemma License | Google製 翻訳特化、55言語対応 |
-| PLaMo-2-translate | ~4.6-5.5 GB | PLaMo Community | PFN製 翻訳特化、個人利用のみ |
+| PLaMo-2-translate | ~4.6-5.5 GB | PLaMo Community | Legacy（個人利用のみ） |
 | Qwen3-8B | ~5.0 GB | Apache 2.0 | Legacy |
 | Qwen3-4B | ~2.5 GB | Apache 2.0 | Legacy |
 | ELYZA-JP-8B | ~4.9 GB | Llama 3 | Legacy |
